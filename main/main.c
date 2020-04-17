@@ -17,13 +17,16 @@
 #include "lwip/dns.h"
 #include "cJSON.h"
 
+
+#define SHOW_ALL_LOGS false
+
+
 	// ================================================
 	//	AP client definitions
 	// ================================================
 
 
 #define WIFI_NIEMCEWICZA
-#define NEW_CONTENT 1
 
 
 #if defined(WIFI_BLEBOX)
@@ -231,13 +234,21 @@ char* getJsonFromResponse(char *response, uint16_t response_length){
 				count_begin++;
 				if (count_begin == 1) {
 					json_begin = i;
-					//ESP_LOGI(TAG, "Found Json beginning: %d", i);
+
+					if(SHOW_ALL_LOGS == true){
+						ESP_LOGI(TAG, "Found Json beginning: %d", i);
+					}
+
 				}
 			} else if (response[i] == '}') {
 				count_end++;
 				if (count_end == count_begin) {
 					json_end = i;
-					//ESP_LOGI(TAG, "Found Json end: %d", i);
+
+					if (SHOW_ALL_LOGS == true) {
+						ESP_LOGI(TAG, "Found Json end: %d", i);
+					}
+
 				}
 			}
 		}
@@ -252,7 +263,12 @@ char* getJsonFromResponse(char *response, uint16_t response_length){
 			for (int k = 0; k < json_len; k++){
 				json[k] = response[k + json_begin];
 			}
-			//ESP_LOGI(TAG, "Returning json, json length: %d", json_len);
+
+			if (SHOW_ALL_LOGS == true) {
+				ESP_LOGI(TAG, "Returning json, json length: %d", json_len);
+			}
+
+
 			return json;
 
 		}
@@ -310,13 +326,17 @@ api_gate_state get_api_gate_state(char *json){
 	api_gate_state gatebox_state = API_GATE_STATE_DEFAULT();
 
 	cJSON *root = cJSON_Parse(json);
-	ESP_LOGI(GATEBOX_TAG, "cJSON root created");
+	if(SHOW_ALL_LOGS == true){
+		ESP_LOGI(GATEBOX_TAG, "cJSON root created");
+	}
 
 	// currentPos override
 	cJSON *currentPos = cJSON_GetObjectItem(root, "currentPos");
 	gatebox_state.currentPos = currentPos->valueint;
 
-	ESP_LOGI(GATEBOX_TAG, "cJSON GATE: CurrentPos Value %d", gatebox_state.currentPos);
+	if(SHOW_ALL_LOGS == true){
+		ESP_LOGI(GATEBOX_TAG, "cJSON GATE: CurrentPos Value %d", gatebox_state.currentPos);
+	}
 
 	cJSON_Delete(root);
 
@@ -465,16 +485,26 @@ static void http_get_device_state(void *pvParameters)
 	device_name device_name = param->device_name;
 
 	if (device_name == gateBox) {
-		printf("Destination device: switchBox \n");
+
+		if (SHOW_ALL_LOGS == true) {
+			ESP_LOGI(TAG, "Destination device: switchBox");
+		}
+
 		device_ip = GATEBOX_HOST;
 		request = GATEBOX_REQUEST;
+
 	} else if (device_name == tempSensor) {
-		printf("Destination device: tempSensor \n");
+
+		if (SHOW_ALL_LOGS == true) {
+			ESP_LOGI(TAG, "Destination device: tempSensor");
+		}
+
 		device_ip = TEMPSENSOR_HOST;
 		request = TEMPSENSOR_REQUEST;
+
 	}
 	else {
-		printf("Errorr: There is no such device");
+		ESP_LOGE(TAG, "No such device!");
 	}
 
     const struct addrinfo hints = {
@@ -499,7 +529,9 @@ static void http_get_device_state(void *pvParameters)
 
            Note: inet_ntoa is non-reentrant, look at ipaddr_ntoa_r for "real" code */
         addr = &((struct sockaddr_in *)res->ai_addr)->sin_addr;
-        ESP_LOGI(TAG, "DNS lookup succeeded. IP=%s", inet_ntoa(*addr));
+        if (SHOW_ALL_LOGS == true) {
+        	ESP_LOGI(TAG, "DNS lookup succeeded. IP=%s", inet_ntoa(*addr));
+        }
 
         s = socket(res->ai_family, res->ai_socktype, 0);
         if(s < 0) {
@@ -508,7 +540,10 @@ static void http_get_device_state(void *pvParameters)
             vTaskDelay(1000 / portTICK_PERIOD_MS);
             continue;
         }
-        ESP_LOGI(TAG, "... allocated socket");
+
+        if (SHOW_ALL_LOGS == true) {
+        	ESP_LOGI(TAG, "... allocated socket");
+        }
 
         if(connect(s, res->ai_addr, res->ai_addrlen) != 0) {
             ESP_LOGE(TAG, "... socket connect failed errno=%d", errno);
@@ -518,7 +553,10 @@ static void http_get_device_state(void *pvParameters)
             continue;
         }
 
-        ESP_LOGI(TAG, "... connected");
+        if (SHOW_ALL_LOGS == true) {
+        	ESP_LOGI(TAG, "... connected");
+        }
+
         freeaddrinfo(res);
 
         if (write(s, request, strlen(request)) < 0) {
@@ -527,7 +565,10 @@ static void http_get_device_state(void *pvParameters)
             vTaskDelay(4000 / portTICK_PERIOD_MS);
             continue;
         }
-        ESP_LOGI(TAG, "... socket send success");
+
+        if (SHOW_ALL_LOGS == true) {
+        	ESP_LOGI(TAG, "... socket send success");
+        }
 
         struct timeval receiving_timeout;
         receiving_timeout.tv_sec = 5;
@@ -539,7 +580,10 @@ static void http_get_device_state(void *pvParameters)
             vTaskDelay(4000 / portTICK_PERIOD_MS);
             continue;
         }
-        ESP_LOGI(TAG, "... set socket receiving timeout success");
+
+        if (SHOW_ALL_LOGS == true) {
+        	ESP_LOGI(TAG, "... set socket receiving timeout success");
+        }
 
         // =============================================================================================
 
@@ -588,8 +632,10 @@ static void http_get_device_state(void *pvParameters)
 
 		// =============================================================================================
 
+        if (SHOW_ALL_LOGS == true) {
+        	ESP_LOGI(TAG, "... done reading from socket. Last read return=%d errno=%d.", r, errno);
+        }
 
-        ESP_LOGI(TAG, "... done reading from socket. Last read return=%d errno=%d.", r, errno);
         close(s);
         for(int countdown = 1; countdown >= 0; countdown--) {
             ESP_LOGI(TAG, "%d... ", countdown);
@@ -710,15 +756,16 @@ void app_main(void) {
 	// AP server start
 	ap_client_start();
 
-	destination_device temp;
-	destination_device gate;
-	device_name temp_dn = tempSensor;
-	device_name gate_dn = gateBox;
+	static destination_device temp;
+	static destination_device gate;
+	static device_name temp_dn = tempSensor;
+	static device_name gate_dn = gateBox;
+
 	temp.device_name = temp_dn;
 	gate.device_name = gate_dn;
 
 	//xTaskCreate(&http_get_task, "http_get_task", 4096, NULL, 5, NULL);
 	xTaskCreate(&http_get_device_state, "htpp_get_device_state", 4096, &temp, 5, NULL);
-	//xTaskCreate(&http_get_device_state, "htpp_get_device_state", 4096, &gate, 5, NULL);
+	xTaskCreate(&http_get_device_state, "htpp_get_device_state", 4096, &gate, 5, NULL);
 }
 

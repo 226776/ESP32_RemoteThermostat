@@ -26,34 +26,6 @@
 	// ================================================
 
 
-#define WIFI_NIEMCEWICZA
-
-
-#if defined(WIFI_BLEBOX)
-
-#define WIFI_SSID      "KingsMan"
-#define WIFI_PASS      "ILoveBleBox"
-#define MAXIMUM_RETRY  5
-
-#elif defined(WIFI_DZIWISZOW)
-
-#define WIFI_SSID      "Macek dlink"
-#define WIFI_PASS      "macekmackiewicz"
-#define MAXIMUM_RETRY  5
-
-#elif defined(WIFI_NIEMCEWICZA)
-
-#define WIFI_SSID      "SweetestPerfection"
-#define WIFI_PASS      "Ni@@Ni@@22"
-#define MAXIMUM_RETRY  5
-
-#else
-
-#define WIFI_SSID      "AXDition"
-#define WIFI_PASS      "OFFCAPSLOCKIDIOT"
-#define MAXIMUM_RETRY  5
-
-#endif
 
 	// ================================================
 	//	HTTP definitions

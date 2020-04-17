@@ -17,6 +17,8 @@
 #include "lwip/dns.h"
 #include "cJSON.h"
 
+// This contains my wifi data, if you don't have it simply type values in AP client definitions section
+#include "wifi_pass.h"
 
 #define SHOW_ALL_LOGS false
 
@@ -25,6 +27,16 @@
 	//	AP client definitions
 	// ================================================
 
+#ifndef WIFI_SSID
+	// Put your SSID
+	WIFI_SSID "majesiec"
+
+	// Put your PASSWORD
+	WIFI_PASS "youpassword"
+
+	// Put max retrys
+	MAXIMUM_RETRY 5
+#endif
 
 
 	// ================================================

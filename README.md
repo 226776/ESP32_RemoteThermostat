@@ -13,7 +13,6 @@ The goal is, to create an embedded server working on ESP32 (idf), that can be a 
 This can also be template for other more complicated tasks using blebox devices.
 
 ## Project info
-- Platform: Linux Debian 10 
 - Software: Eclipse (with ESP32 Dev plugins) 
 
 ## Done 

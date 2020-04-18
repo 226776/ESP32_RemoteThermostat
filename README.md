@@ -16,7 +16,7 @@ This can also be template for other more complicated tasks using blebox devices.
 - Software: Eclipse (with ESP32 Dev plugins) 
 
 ## Done 
-- Start access point, connecting to local wi-fi (handled by default event loop)
+- Start access point, connect to local wi-fi (handled by default event loop)
 - Start new thread
 - Send request url 
 - Get request response

@@ -1,5 +1,5 @@
-# ESP32_RemoteThermostat
-Remote thermostat using blebox devices. 
+# ESP32 RemoteThermostat
+Remote thermostat using blebox devices working on ESP32. 
 
 ## Autors
 - Krystian Kasprów

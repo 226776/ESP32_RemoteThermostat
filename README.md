@@ -30,3 +30,6 @@ This can also be template for other more complicated tasks using blebox devices.
 
 ## TODO:
 - pass data through web page
+
+## Web page view
+![Image description](images/webPage_view.png)

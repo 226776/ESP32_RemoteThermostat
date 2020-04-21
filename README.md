@@ -30,6 +30,9 @@ This can also be template for other more complicated tasks using blebox devices.
 
 ## TODO:
 - pass data through web page
+- create main thermostat function 
 
-## Web page view
+## Web page
+If device has successfully connected to wifi and receives IP address, type on any local device (connected to same local network):
+<IP>/hello 
 ![Image description](images/webPage_view.png)

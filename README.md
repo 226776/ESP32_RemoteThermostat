@@ -24,8 +24,9 @@ This can also be template for other more complicated tasks using blebox devices.
 - Multithreading
 - GateBox state read
 - TempSensor state read
+- SwitchBox command send
+- http server
+- html web page send as http response 
 
 ## TODO:
-- use Queue to exchange data between threads
-- new thred controlling siwtchBoxDC
-- http server with html interface to pass data/configuration
+- pass data through web page

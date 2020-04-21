@@ -1,5 +1,4 @@
 
-
 #include <string.h>
 #include "freertos/FreeRTOS.h"
 #include "freertos/task.h"
@@ -17,8 +16,11 @@
 #include "lwip/dns.h"
 #include "cJSON.h"
 
-// This contains my wifi data, if you don't have it simply type values in AP client definitions section
-#include "wifi_pass.h"
+// User defined
+
+#include "ap_client.h"
+#include "http_server_webpage.h"
+
 
 #define SHOW_ALL_LOGS false
 
@@ -29,13 +31,13 @@
 
 #ifndef WIFI_SSID
 	// Put your SSID
-	WIFI_SSID "majesiec"
+#define	WIFI_SSID "majesiec"
 
 	// Put your PASSWORD
-	WIFI_PASS "youpassword"
+#define	WIFI_PASS "youpassword"
 
 	// Put max retrys
-	MAXIMUM_RETRY 5
+#define	MAXIMUM_RETRY 5
 #endif
 
 
@@ -59,7 +61,7 @@
 #define TEMPSENSOR_STATE "/api/tempsensor/state"
 
 	// ------- 	SWITCHBOX 	-------
-#define SWITCHBOX_HOST "192.168.9.104"
+#define SWITCHBOX_HOST "192.168.1.245"
 #define SWITCHBOX_ON "/s/1"
 #define SWITCHBOX_OFF "/s/0"
 
@@ -67,7 +69,7 @@
 	//	Static variables
 	// ================================================
 
-static const char *TAG = "OvenController";
+static const char *TAG = "MAIN";
 
 static const char *REQUEST = "GET " WEB_PATH " HTTP/1.1\r\n"
     "Host: "WEB_SERVER":"WEB_PORT"\r\n"
@@ -85,12 +87,12 @@ static const char *TEMPSENSOR_REQUEST = "GET " TEMPSENSOR_STATE " HTTP/1.1\r\n"
     "\r\n";
 
 static const char *SWITCHBOX_ON_REQUEST = "GET " SWITCHBOX_ON " HTTP/1.1\r\n"
-    "Host: "TEMPSENSOR_HOST":"WEB_PORT"\r\n"
+    "Host: "SWITCHBOX_HOST":"WEB_PORT"\r\n"
     "User-Agent: esp-idf/1.1 esp32\r\n"
     "\r\n";
 
 static const char *SWITCHBOX_OFF_REQUEST = "GET " SWITCHBOX_OFF " HTTP/1.1\r\n"
-    "Host: "TEMPSENSOR_HOST":"WEB_PORT"\r\n"
+    "Host: "SWITCHBOX_HOST":"WEB_PORT"\r\n"
     "User-Agent: esp-idf/1.1 esp32\r\n"
     "\r\n";
 
@@ -101,15 +103,29 @@ static const char *SWITCHBOX_OFF_REQUEST = "GET " SWITCHBOX_OFF " HTTP/1.1\r\n"
 
 // **************** General	 	****************
 
-typedef struct {
-	uint8_t device_name;
-}destination_device;
-
 typedef enum {
 	tempSensor = 0,
 	gateBox = 1,
+	switchBox = 2,
 }device_name;
 
+typedef enum {
+	OFF = 0,
+	ON = 1,
+}switchBox_command;
+
+typedef enum {
+	GET = 0,
+	SET = 1,
+}command_type;
+
+typedef struct {
+	uint8_t device_name;
+	uint8_t command;
+	uint8_t command_type;
+	float 	data;
+
+}destination_device;
 
 // **************** TempSensor 	****************
 
@@ -171,11 +187,9 @@ typedef struct {
 };
 
 
-
 	// ================================================
 	//	Test Functions
 	// ================================================
-
 
 
 typedef struct {
@@ -194,8 +208,6 @@ void test_func(void *pvParameters){
 
 	vTaskDelete(NULL);
 }
-
-
 
 	// ================================================
 	//	Request Functions
@@ -328,145 +340,17 @@ api_gate_state get_api_gate_state(char *json){
 }
 
 
-static void http_send_command(void *pvParameters)
-{
-    const struct addrinfo hints = {
-        .ai_family = AF_INET,
-        .ai_socktype = SOCK_STREAM,
-    };
-    struct addrinfo *res;
-    struct in_addr *addr;
-    int s, r;
-    char recv_buf[64];
-
-    while(1) {
-        int err = getaddrinfo(WEB_SERVER, WEB_PORT, &hints, &res);
-
-        if(err != 0 || res == NULL) {
-            ESP_LOGE(TAG, "DNS lookup failed err=%d res=%p", err, res);
-            vTaskDelay(1000 / portTICK_PERIOD_MS);
-            continue;
-        }
-
-        /* Code to print the resolved IP.
-
-           Note: inet_ntoa is non-reentrant, look at ipaddr_ntoa_r for "real" code */
-        addr = &((struct sockaddr_in *)res->ai_addr)->sin_addr;
-        ESP_LOGI(TAG, "DNS lookup succeeded. IP=%s", inet_ntoa(*addr));
-
-        s = socket(res->ai_family, res->ai_socktype, 0);
-        if(s < 0) {
-            ESP_LOGE(TAG, "... Failed to allocate socket.");
-            freeaddrinfo(res);
-            vTaskDelay(1000 / portTICK_PERIOD_MS);
-            continue;
-        }
-        ESP_LOGI(TAG, "... allocated socket");
-
-        if(connect(s, res->ai_addr, res->ai_addrlen) != 0) {
-            ESP_LOGE(TAG, "... socket connect failed errno=%d", errno);
-            close(s);
-            freeaddrinfo(res);
-            vTaskDelay(4000 / portTICK_PERIOD_MS);
-            continue;
-        }
-
-        ESP_LOGI(TAG, "... connected");
-        freeaddrinfo(res);
-
-        if (write(s, REQUEST, strlen(REQUEST)) < 0) {
-            ESP_LOGE(TAG, "... socket send failed");
-            close(s);
-            vTaskDelay(4000 / portTICK_PERIOD_MS);
-            continue;
-        }
-        ESP_LOGI(TAG, "... socket send success");
-
-        struct timeval receiving_timeout;
-        receiving_timeout.tv_sec = 5;
-        receiving_timeout.tv_usec = 0;
-        if (setsockopt(s, SOL_SOCKET, SO_RCVTIMEO, &receiving_timeout,
-                sizeof(receiving_timeout)) < 0) {
-            ESP_LOGE(TAG, "... failed to set socket receiving timeout");
-            close(s);
-            vTaskDelay(4000 / portTICK_PERIOD_MS);
-            continue;
-        }
-        ESP_LOGI(TAG, "... set socket receiving timeout success");
-
-        // =============================================================================================
-
-
-		#define EXPECTED_MAX_RESPONSE_LENGTH 500
-        char resoponse[EXPECTED_MAX_RESPONSE_LENGTH];
-        char* json;
-
-
-        /* Read HTTP response */
-
-        int iter = 0;
-        do {
-            bzero(recv_buf, sizeof(recv_buf));
-            r = read(s, recv_buf, sizeof(recv_buf)-1);
-
-            for(int i = 0; i < r; i++) {
-
-            	if(iter < EXPECTED_MAX_RESPONSE_LENGTH){
-            		resoponse[iter] = recv_buf[i];
-            		iter ++;
-            	}
-            	else{
-            		ESP_LOGE(TAG, "Response lenght bigger than expected max response length!");
-            	}
-
-            }
-        } while(r > 0);
-
-        json = getJsonFromResponse(resoponse, (uint16_t) EXPECTED_MAX_RESPONSE_LENGTH);
-
-        //api_gate_state gatebox_state = get_api_gate_state(json);
-
-        api_tempsensor_state_tempSensor_sensors_0 api_tempsensor_state = get_api_tempensor_state(json);
-
-        //ESP_LOGI(TAG, "jSON GateBox Value %d: ", gatebox_state.currentPos);
-        ESP_LOGI(TAG, "jSON Tempsensor Value:  %.1f", ((float)api_tempsensor_state.value)/100);
-
-
-        // print only json
-        printf("\n--------------------------------------------\n");
-        if(json == NULL){
-        	ESP_LOGE(TAG, "ERRR");
-        }
-        else{
-        	printf("%s", json);
-        	printf("\nSomething\n");
-        }
-
-
-
-
-
-		// =============================================================================================
-
-
-        ESP_LOGI(TAG, "... done reading from socket. Last read return=%d errno=%d.", r, errno);
-        close(s);
-        for(int countdown = 1; countdown >= 0; countdown--) {
-            ESP_LOGI(TAG, "%d... ", countdown);
-            vTaskDelay(1000 / portTICK_PERIOD_MS);
-        }
-        ESP_LOGI(TAG, "Starting again!");
-    }
-}
-
 static void http_get_device_state(void *pvParameters)
 {
+
+	bool sendPeriodycally = true;
+	bool readResponse = true;
 
 	char* device_ip = WEB_SERVER;
 	char* request = REQUEST;
 
-	destination_device *param = (test_struct*) pvParameters;
-	device_name device_name = param->device_name;
+	destination_device *device = (test_struct*) pvParameters;
+	device_name device_name = device->device_name;
 
 	if (device_name == gateBox) {
 
@@ -486,6 +370,23 @@ static void http_get_device_state(void *pvParameters)
 		device_ip = TEMPSENSOR_HOST;
 		request = TEMPSENSOR_REQUEST;
 
+	} else if (device_name == switchBox) {
+
+		if (SHOW_ALL_LOGS == true) {
+			ESP_LOGI(TAG, "Destination device: switchBox");
+		}
+
+		device_ip = SWITCHBOX_HOST;
+
+		// Asign proper request
+		if (device->command == ON) {
+			request = SWITCHBOX_ON_REQUEST;
+		} else {
+			request = SWITCHBOX_OFF_REQUEST;
+		}
+
+		sendPeriodycally = false;
+
 	}
 	else {
 		ESP_LOGE(TAG, "No such device!");
@@ -500,7 +401,7 @@ static void http_get_device_state(void *pvParameters)
     int s, r;
     char recv_buf[64];
 
-    while(1) {
+    do{
         int err = getaddrinfo(device_ip, WEB_PORT, &hints, &res);
 
         if(err != 0 || res == NULL) {
@@ -575,181 +476,139 @@ static void http_get_device_state(void *pvParameters)
         char resoponse[EXPECTED_MAX_RESPONSE_LENGTH];
         char* json;
 
-        /* Read HTTP response */
+        if(readResponse) {
 
-        int iter = 0;
-        do {
-            bzero(recv_buf, sizeof(recv_buf));
-            r = read(s, recv_buf, sizeof(recv_buf)-1);
+			/* Read HTTP response */
 
-            for(int i = 0; i < r; i++) {
+			int iter = 0;
+			do {
+				bzero(recv_buf, sizeof(recv_buf));
+				r = read(s, recv_buf, sizeof(recv_buf)-1);
 
-            	if(iter < EXPECTED_MAX_RESPONSE_LENGTH){
-            		resoponse[iter] = recv_buf[i];
-            		iter ++;
-            	}
-            	else{
-            		ESP_LOGE(TAG, "Response lenght bigger than expected max response length!");
-            	}
+				for(int i = 0; i < r; i++) {
 
-            }
-        } while(r > 0);
+					if(iter < EXPECTED_MAX_RESPONSE_LENGTH){
+						resoponse[iter] = recv_buf[i];
+						iter ++;
+					}
+					else{
+						ESP_LOGE(TAG, "Response lenght bigger than expected max response length!");
+					}
 
-        // =============================================================================================
+				}
+			} while(r > 0);
 
-        json = getJsonFromResponse(resoponse, (uint16_t) EXPECTED_MAX_RESPONSE_LENGTH);
+			// =============================================================================================
 
-
-        if (device_name == gateBox) {
-
-			api_gate_state gatebox_state = get_api_gate_state(json);
-
-			ESP_LOGI(TAG, "jSON GateBox Value %d: ", gatebox_state.currentPos);
-
-		} else if (device_name == tempSensor) {
-
-			api_tempsensor_state_tempSensor_sensors_0 api_tempsensor_state = get_api_tempensor_state(json);
-
-			ESP_LOGI(TAG, "jSON Tempsensor Value:  %.1f", ((float )api_tempsensor_state.value) / 100);
-		}
+			json = getJsonFromResponse(resoponse, (uint16_t) EXPECTED_MAX_RESPONSE_LENGTH);
 
 
-		// =============================================================================================
+			if (device_name == gateBox) {
 
-        if (SHOW_ALL_LOGS == true) {
-        	ESP_LOGI(TAG, "... done reading from socket. Last read return=%d errno=%d.", r, errno);
+				api_gate_state gatebox_state = get_api_gate_state(json);
+
+				device->data = gatebox_state.currentPos;
+
+				if (SHOW_ALL_LOGS == true) {
+					ESP_LOGI(TAG, "jSON GateBox Value %d: ",
+							gatebox_state.currentPos);
+				}
+
+
+
+			} else if (device_name == tempSensor) {
+
+				api_tempsensor_state_tempSensor_sensors_0 api_tempsensor_state = get_api_tempensor_state(json);
+
+				float temperature = ((float )api_tempsensor_state.value) / 100;
+
+				device->data = temperature;
+
+				if (SHOW_ALL_LOGS == true) {
+					ESP_LOGI(TAG, "jSON Tempsensor Value:  %.1f", temperature);
+				}
+
+			}
+
+
+			// =============================================================================================
+
+			if (SHOW_ALL_LOGS == true) {
+				ESP_LOGI(TAG, "... done reading from socket. Last read return=%d errno=%d.", r, errno);
+			}
+
+			close(s);
+			for(int countdown = 1; countdown >= 0; countdown--) {
+				if (SHOW_ALL_LOGS == true) {
+					ESP_LOGI(TAG, "%d... ", countdown);
+				}
+
+				vTaskDelay(1000 / portTICK_PERIOD_MS);
+			}
+			if (SHOW_ALL_LOGS == true) {
+				ESP_LOGI(TAG, "Starting again!");
+			}
         }
 
-        close(s);
-        for(int countdown = 1; countdown >= 0; countdown--) {
-            ESP_LOGI(TAG, "%d... ", countdown);
-            vTaskDelay(1000 / portTICK_PERIOD_MS);
-        }
-        ESP_LOGI(TAG, "Starting again!");
-    }
+    }while(sendPeriodycally);
+
+    vTaskDelete(NULL);
+
 }
 
-	// ================================================
-	//	AP client handlers / Init
-	// ================================================
 
-
-/* FreeRTOS event group to signal when we are connected*/
-static EventGroupHandle_t s_wifi_event_group;
-
-/* The event group allows multiple bits for each event, but we only care about two events:
- * - we are connected to the AP with an IP
- * - we failed to connect after the maximum amount of retries */
-#define WIFI_CONNECTED_BIT BIT0
-#define WIFI_FAIL_BIT      BIT1
-
-static int s_retry_num = 0;
-
-static void event_handler(void* arg, esp_event_base_t event_base,
-                                int32_t event_id, void* event_data)
-{
-    if (event_base == WIFI_EVENT && event_id == WIFI_EVENT_STA_START) {
-        esp_wifi_connect();
-    } else if (event_base == WIFI_EVENT && event_id == WIFI_EVENT_STA_DISCONNECTED) {
-        if (s_retry_num < MAXIMUM_RETRY) {
-            esp_wifi_connect();
-            s_retry_num++;
-            ESP_LOGI(TAG, "retry to connect to the AP");
-        } else {
-            xEventGroupSetBits(s_wifi_event_group, WIFI_FAIL_BIT);
-        }
-        ESP_LOGI(TAG,"connect to the AP fail");
-    } else if (event_base == IP_EVENT && event_id == IP_EVENT_STA_GOT_IP) {
-        ip_event_got_ip_t* event = (ip_event_got_ip_t*) event_data;
-        ESP_LOGI(TAG, "got ip:" IPSTR, IP2STR(&event->ip_info.ip));
-        s_retry_num = 0;
-        xEventGroupSetBits(s_wifi_event_group, WIFI_CONNECTED_BIT);
-    }
-}
-
-void wifi_init_sta(void)
-{
-    s_wifi_event_group = xEventGroupCreate();
-
-    ESP_ERROR_CHECK(esp_netif_init());
-
-    ESP_ERROR_CHECK(esp_event_loop_create_default());
-    esp_netif_create_default_wifi_sta();
-
-    wifi_init_config_t cfg = WIFI_INIT_CONFIG_DEFAULT();
-    ESP_ERROR_CHECK(esp_wifi_init(&cfg));
-
-    ESP_ERROR_CHECK(esp_event_handler_register(WIFI_EVENT, ESP_EVENT_ANY_ID, &event_handler, NULL));
-    ESP_ERROR_CHECK(esp_event_handler_register(IP_EVENT, IP_EVENT_STA_GOT_IP, &event_handler, NULL));
-
-    wifi_config_t wifi_config = {
-        .sta = {
-            .ssid = WIFI_SSID,
-            .password = WIFI_PASS
-        },
-    };
-    ESP_ERROR_CHECK(esp_wifi_set_mode(WIFI_MODE_STA) );
-    ESP_ERROR_CHECK(esp_wifi_set_config(ESP_IF_WIFI_STA, &wifi_config) );
-    ESP_ERROR_CHECK(esp_wifi_start() );
-
-    ESP_LOGI(TAG, "wifi_init_sta finished.");
-
-    /* Waiting until either the connection is established (WIFI_CONNECTED_BIT) or connection failed for the maximum
-     * number of re-tries (WIFI_FAIL_BIT). The bits are set by event_handler() (see above) */
-    EventBits_t bits = xEventGroupWaitBits(s_wifi_event_group,
-            WIFI_CONNECTED_BIT | WIFI_FAIL_BIT,
-            pdFALSE,
-            pdFALSE,
-            portMAX_DELAY);
-
-    /* xEventGroupWaitBits() returns the bits before the call returned, hence we can test which event actually
-     * happened. */
-    if (bits & WIFI_CONNECTED_BIT) {
-        ESP_LOGI(TAG, "connected to ap SSID:%s password:%s",
-                 WIFI_SSID, WIFI_PASS);
-    } else if (bits & WIFI_FAIL_BIT) {
-        ESP_LOGI(TAG, "Failed to connect to SSID:%s, password:%s",
-                 WIFI_SSID, WIFI_PASS);
-    } else {
-        ESP_LOGE(TAG, "UNEXPECTED EVENT");
-    }
-
-    ESP_ERROR_CHECK(esp_event_handler_unregister(IP_EVENT, IP_EVENT_STA_GOT_IP, &event_handler));
-    ESP_ERROR_CHECK(esp_event_handler_unregister(WIFI_EVENT, ESP_EVENT_ANY_ID, &event_handler));
-    vEventGroupDelete(s_wifi_event_group);
-}
-
-void ap_client_start() {
-	//Initialize NVS
-	esp_err_t ret = nvs_flash_init();
-	if (ret == ESP_ERR_NVS_NO_FREE_PAGES || ret == ESP_ERR_NVS_NEW_VERSION_FOUND) {
-		ESP_ERROR_CHECK(nvs_flash_erase());
-		ret = nvs_flash_init();
-	}
-	ESP_ERROR_CHECK(ret);
-
-	ESP_LOGI(TAG, "ESP_WIFI_MODE_STA");
-	wifi_init_sta();
-}
 
 	// ================================================
 	//	APP MAIN
 	// ================================================
 
 void app_main(void) {
-	// AP server start
+
+	// AP server start and connect to wifi
 	ap_client_start();
 
+	// http server start (for html settings)
+	http_server_start();
+
+	// declare devices
+	// tempSensor
 	static destination_device temp;
-	static destination_device gate;
 	static device_name temp_dn = tempSensor;
-	static device_name gate_dn = gateBox;
-
 	temp.device_name = temp_dn;
-	gate.device_name = gate_dn;
 
-	//xTaskCreate(&http_get_task, "http_get_task", 4096, NULL, 5, NULL);
-	xTaskCreate(&http_get_device_state, "htpp_get_device_state", 4096, &temp, 5, NULL);
-	xTaskCreate(&http_get_device_state, "htpp_get_device_state", 4096, &gate, 5, NULL);
+	// gateBox
+	static destination_device gate;
+	static device_name gateName = gateBox;
+	gate.device_name = gateName;
+
+	// switchBox
+	static destination_device sw;
+	static device_name sw_dn = switchBox;
+	static switchBox_command switchBoxCommand = ON;
+	sw.device_name = sw_dn;
+	sw.command = switchBoxCommand;
+
+
+	// Run thread periodically checking state of tempSensor
+	xTaskCreate(&http_get_device_state, "http_get_device_state", 4096, &temp, 5, NULL);
+	// Run thread periodically checking state of gateBox
+	xTaskCreate(&http_get_device_state, "http_get_device_state", 4096, &gate, 5, NULL);
+
+
+	while(1){
+
+		ESP_LOGI(TAG, "TempSensor: 	%.1f", temp.data);
+		ESP_LOGI(TAG, "GateBox: 	%.0f", gate.data);
+
+		/*
+		sw.command = OFF;
+		xTaskCreate(&http_get_device_state, "http_get_device_state", 4096, &sw, 5, NULL);
+
+		sw.command = ON;
+		xTaskCreate(&http_get_device_state, "http_get_device_state", 4096, &sw,5, NULL);
+		*/
+
+		vTaskDelay(6000 / portTICK_PERIOD_MS);
+	}
 }
 

@@ -33,6 +33,7 @@ This can also be template for other more complicated tasks using blebox devices.
 - create main thermostat function 
 
 ## Web page
-If device has successfully connected to wifi and receives IP address, type on any local device (connected to same local network):
+If device has successfully connected to wifi and receives IP address, <br /> type on any local device (connected to same local network):
 <IP>/hello 
+  
 ![Image description](images/webPage_view.png)

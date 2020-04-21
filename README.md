@@ -34,6 +34,6 @@ This can also be template for other more complicated tasks using blebox devices.
 
 ## Web page
 If device has successfully connected to wifi and receives IP address, <br /> type on any local device (connected to same local network):
-<IP>/hello 
+<br />\<IP\>/hello 
   
 ![Image description](images/webPage_view.png)

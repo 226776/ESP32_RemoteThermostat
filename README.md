@@ -2,8 +2,8 @@
 Remote thermostat using blebox devices working on ESP32. 
 
 ## Autors
-- Krystian Kasprów
-- Anita Grontman
+- Krystian Kasprów (226776) 
+- Anita Grontman (226752)
 
 ## Project Description
 

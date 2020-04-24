@@ -1,3 +1,4 @@
+#include <stdio.h>
 #include <esp_wifi.h>
 #include <esp_event.h>
 #include <esp_log.h>
@@ -19,6 +20,7 @@
 #include <esp_http_server.h>
 
 #include "web_page.h"
+#include "typedefs.h"
 
 
 	// ================================================
@@ -27,11 +29,173 @@
 
 
 
+
+//	************** 	Set Off thermostat		**************
+
 static const char *HTTP_SERVER_TAG = "HTTP_SERVER";
 
+static esp_err_t set_off_thermostat_handler(httpd_req_t *req){
+
+	thermostat_params *thermParams = (thermostat_params*) req->user_ctx;
+
+	thermParams->power = false;
+
+	ESP_LOGW(HTTP_SERVER_TAG, "Turning thermostat OFF!");
+
+    return ESP_OK;
+}
+
+
+httpd_uri_t set_off_thermostat = {
+    .uri       = "/off",
+    .method    = HTTP_POST,
+    .handler   = set_off_thermostat_handler,
+    /* Let's pass response string in user
+     * context to demonstrate it's usage */
+    .user_ctx  = NULL
+};
+
+
+//	************** 	Set On thermostat 		**************
+
+static esp_err_t set_on_thermostat_handler(httpd_req_t *req){
+
+
+		thermostat_params *thermParams = (thermostat_params*) req->user_ctx;
+
+		thermParams->power = true;
+
+		ESP_LOGW(HTTP_SERVER_TAG, "Turning thermostat ON!");
+
+    return ESP_OK;
+}
+
+
+httpd_uri_t set_on_thermostat = {
+    .uri       = "/on",
+    .method    = HTTP_POST,
+    .handler   = set_on_thermostat_handler,
+    /* Let's pass response string in user
+     * context to demonstrate it's usage */
+    .user_ctx  = NULL
+};
+
+
+//	************** 	Set Low threshold 		**************
+
+static esp_err_t set_temp_low_handler(httpd_req_t *req){
+
+    char buf[100];
+    int ret, remaining = req->content_len;
+
+    while (remaining > 0) {
+        /* Read the data for the request */
+        if ((ret = httpd_req_recv(req, buf,
+                        MIN(remaining, sizeof(buf)))) <= 0) {
+            if (ret == HTTPD_SOCK_ERR_TIMEOUT) {
+                /* Retry receiving if timeout occurred */
+                continue;
+            }
+            return ESP_FAIL;
+        }
+
+        /* Send back the same data */
+        httpd_resp_send_chunk(req, buf, ret);
+        remaining -= ret;
+
+        float temp;
+		char *pend;
+		temp = strtof(buf, &pend);
+
+		thermostat_params *thermParams = (thermostat_params*) req->user_ctx;
+
+		if (temp <= thermParams->temp_high) {
+			thermParams->temp_low = (uint8_t)temp;
+
+			ESP_LOGI(HTTP_SERVER_TAG, "Setting up Temp High to : %.0f", temp);
+
+		} else {
+			ESP_LOGE(HTTP_SERVER_TAG, "Temp Low can't be bigger than Temp High!");
+		}
+
+
+    }
+
+    // End response
+    httpd_resp_send_chunk(req, NULL, 0);
+    return ESP_OK;
+}
+
+
+httpd_uri_t set_temp_low = {
+    .uri       = "/s/l",
+    .method    = HTTP_POST,
+    .handler   = set_temp_low_handler,
+    /* Let's pass response string in user
+     * context to demonstrate it's usage */
+    .user_ctx  = NULL
+};
+
+
+//	************** 	Set High  threshold 	**************
+
+static esp_err_t set_temp_high_handler(httpd_req_t *req){
+
+    char buf[100];
+    int ret, remaining = req->content_len;
+
+    while (remaining > 0) {
+        /* Read the data for the request */
+        if ((ret = httpd_req_recv(req, buf,
+                        MIN(remaining, sizeof(buf)))) <= 0) {
+            if (ret == HTTPD_SOCK_ERR_TIMEOUT) {
+                /* Retry receiving if timeout occurred */
+                continue;
+            }
+            return ESP_FAIL;
+        }
+
+        /* Send back the same data */
+        httpd_resp_send_chunk(req, buf, ret);
+        remaining -= ret;
+
+        float temp;
+		char *pend;
+		temp = strtof(buf, &pend);
+
+		thermostat_params *thermParams = (thermostat_params*) req->user_ctx;
+		if(temp >= thermParams->temp_low){
+			thermParams->temp_high = (uint8_t)temp;
+
+			ESP_LOGI(HTTP_SERVER_TAG, "Setting up Temp Low to : %.0f", temp);
+
+		}
+		else{
+			ESP_LOGE(HTTP_SERVER_TAG, "Temp High can't be lower than Temp Low!");
+		}
+
+    }
+
+    // End response
+    httpd_resp_send_chunk(req, NULL, 0);
+    return ESP_OK;
+}
+
+httpd_uri_t set_temp_high = {
+    .uri       = "/s/h",
+    .method    = HTTP_POST,
+    .handler   = set_temp_high_handler,
+    /* Let's pass response string in user
+     * context to demonstrate it's usage */
+    .user_ctx  = NULL
+};
+
+
+
+//	************** 	Control Panel View  	**************
 
 /* An HTTP GET handler */
-static esp_err_t hello_get_handler(httpd_req_t *req)
+static esp_err_t control_panel_get_handler(httpd_req_t *req)
 {
     char*  buf;
     size_t buf_len;
@@ -105,14 +269,17 @@ static esp_err_t hello_get_handler(httpd_req_t *req)
     return ESP_OK;
 }
 
-static const httpd_uri_t hello = {
-    .uri       = "/hello",
+
+static const httpd_uri_t control_panel = {
+    .uri       = "/",
     .method    = HTTP_GET,
-    .handler   = hello_get_handler,
+    .handler   = control_panel_get_handler,
     /* Let's pass response string in user
      * context to demonstrate it's usage */
     .user_ctx  = webPage
 };
+
+//	************** 	Error Handlers  	**************
 
 /* An HTTP POST handler */
 static esp_err_t echo_post_handler(httpd_req_t *req)
@@ -153,6 +320,8 @@ static const httpd_uri_t echo = {
     .user_ctx  = NULL
 };
 
+
+
 /* This handler allows the custom error handling functionality to be
  * tested from client side. For that, when a PUT request 0 is sent to
  * URI /ctrl, the /hello and /echo URIs are unregistered and following
@@ -180,62 +349,35 @@ esp_err_t http_404_error_handler(httpd_req_t *req, httpd_err_code_t err)
     return ESP_FAIL;
 }
 
-/* An HTTP PUT handler. This demonstrates realtime
- * registration and deregistration of URI handlers
- */
-static esp_err_t ctrl_put_handler(httpd_req_t *req)
+
+
+//	************** 	Start WebServer	 	**************
+
+static httpd_handle_t start_webserver(void *pvParameters)
 {
-    char buf;
-    int ret;
 
-    if ((ret = httpd_req_recv(req, &buf, 1)) <= 0) {
-        if (ret == HTTPD_SOCK_ERR_TIMEOUT) {
-            httpd_resp_send_408(req);
-        }
-        return ESP_FAIL;
-    }
+	thermostat_params *thermParams = (thermostat_params*)pvParameters;
+	set_temp_high.user_ctx = thermParams;
+	set_temp_low.user_ctx = thermParams;
+	set_off_thermostat.user_ctx = thermParams;
+	set_on_thermostat.user_ctx = thermParams;
 
-    if (buf == '0') {
-        /* URI handlers can be unregistered using the uri string */
-        ESP_LOGI(HTTP_SERVER_TAG, "Unregistering /hello and /echo URIs");
-        httpd_unregister_uri(req->handle, "/hello");
-        httpd_unregister_uri(req->handle, "/echo");
-        /* Register the custom error handler */
-        httpd_register_err_handler(req->handle, HTTPD_404_NOT_FOUND, http_404_error_handler);
-    }
-    else {
-        ESP_LOGI(HTTP_SERVER_TAG, "Registering /hello and /echo URIs");
-        httpd_register_uri_handler(req->handle, &hello);
-        httpd_register_uri_handler(req->handle, &echo);
-        /* Unregister custom error handler */
-        httpd_register_err_handler(req->handle, HTTPD_404_NOT_FOUND, NULL);
-    }
-
-    /* Respond with empty body */
-    httpd_resp_send(req, NULL, 0);
-    return ESP_OK;
-}
-
-static const httpd_uri_t ctrl = {
-    .uri       = "/ctrl",
-    .method    = HTTP_PUT,
-    .handler   = ctrl_put_handler,
-    .user_ctx  = NULL
-};
-
-static httpd_handle_t start_webserver(void)
-{
     httpd_handle_t server = NULL;
     httpd_config_t config = HTTPD_DEFAULT_CONFIG();
+
+    ESP_LOGI(HTTP_SERVER_TAG, "Params correct: %d, %d", thermParams->temp_high, thermParams->temp_low);
 
     // Start the httpd server
     ESP_LOGI(HTTP_SERVER_TAG, "Starting server on port: '%d'", config.server_port);
     if (httpd_start(&server, &config) == ESP_OK) {
         // Set URI handlers
         ESP_LOGI(HTTP_SERVER_TAG, "Registering URI handlers");
-        httpd_register_uri_handler(server, &hello);
+        httpd_register_uri_handler(server, &control_panel);
+        httpd_register_uri_handler(server, &set_temp_high);
+        httpd_register_uri_handler(server, &set_temp_low);
+        httpd_register_uri_handler(server, &set_off_thermostat);
+        httpd_register_uri_handler(server, &set_on_thermostat);
         httpd_register_uri_handler(server, &echo);
-        httpd_register_uri_handler(server, &ctrl);
         return server;
     }
 
@@ -266,12 +408,12 @@ static void connect_handler(void* arg, esp_event_base_t event_base,
     httpd_handle_t* server = (httpd_handle_t*) arg;
     if (*server == NULL) {
         ESP_LOGI(HTTP_SERVER_TAG, "Starting webserver");
-        *server = start_webserver();
+        *server = start_webserver(NULL);
     }
 }
 
 
-void http_server_start(){
+void http_server_start(void *pvParameters){
 
     static httpd_handle_t server = NULL;
 
@@ -290,7 +432,7 @@ void http_server_start(){
 #endif // CONFIG_EXAMPLE_CONNECT_ETHERNET
 
     /* Start the server for the first time */
-    server = start_webserver();
+    server = start_webserver(pvParameters);
 
 
 }

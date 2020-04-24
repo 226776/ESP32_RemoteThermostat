@@ -20,13 +20,15 @@
 
 #include "ap_client.h"
 #include "http_server_webpage.h"
+#include "typedefs.h"
 
 
 #define SHOW_ALL_LOGS false
+#define SHOW_MAIN_LOGS true
 
 
 	// ================================================
-	//	AP client definitions
+	//	AP client definitions (default)
 	// ================================================
 
 #ifndef WIFI_SSID
@@ -42,7 +44,7 @@
 
 
 	// ================================================
-	//	HTTP definitions
+	//	HTTP definitions (default)
 	// ================================================
 
 	// ------- 	General 	-------
@@ -71,7 +73,8 @@
 
 static const char *TAG = "MAIN";
 
-static const char *REQUEST = "GET " WEB_PATH " HTTP/1.1\r\n"
+
+volatile char *REQUEST = "GET " WEB_PATH " HTTP/1.1\r\n"
     "Host: "WEB_SERVER":"WEB_PORT"\r\n"
     "User-Agent: esp-idf/1.1 esp32\r\n"
     "\r\n";
@@ -96,118 +99,6 @@ static const char *SWITCHBOX_OFF_REQUEST = "GET " SWITCHBOX_OFF " HTTP/1.1\r\n"
     "User-Agent: esp-idf/1.1 esp32\r\n"
     "\r\n";
 
-
-	// ================================================
-	//	Type Definitions
-	// ================================================
-
-// **************** General	 	****************
-
-typedef enum {
-	tempSensor = 0,
-	gateBox = 1,
-	switchBox = 2,
-}device_name;
-
-typedef enum {
-	OFF = 0,
-	ON = 1,
-}switchBox_command;
-
-typedef enum {
-	GET = 0,
-	SET = 1,
-}command_type;
-
-typedef struct {
-	uint8_t device_name;
-	uint8_t command;
-	uint8_t command_type;
-	float 	data;
-
-}destination_device;
-
-// **************** TempSensor 	****************
-
-typedef struct {
-	char *type;
-	uint8_t id;
-	uint32_t value;
-	uint8_t trend;
-	uint8_t state;
-	uint32_t elapsedTimeS;
-
-} api_tempsensor_state_tempSensor_sensors_0;
-
-#define API_TEMPSENSOR_STATE_DEFAULT() { \
-    .type = "temperature", \
-    .id = 0, \
-    .value = 0, \
-	.trend = 0, \
-	.state = 2, \
-	.elapsedTimeS = 0, \
-};
-
-// **************** GateBox  	****************
-
-typedef struct {
-	uint8_t currentPos;
-	uint8_t desiredPos;
-	uint8_t extraButtonType;
-	uint8_t extraButtonRelayNumber;
-	uint32_t extraButtonPulseTimeMs;
-	uint8_t	extraButtonInvert;
-	uint8_t gateRelayNumber;
-	uint8_t	openLimitSwitchInputNumber;
-	uint8_t	closeLimitSwitchInputNumber;
-	uint8_t	gateType;
-	uint32_t gatePulseTimeMs;
-	uint8_t gateInvert;
-	uint8_t inputsType;
-	uint8_t* fieldsPreferences;
-
-} api_gate_state;
-
-
-#define API_GATE_STATE_DEFAULT() { \
-    .currentPos = 50, \
-    .desiredPos = 50, \
-    .extraButtonType = 3, \
-	.extraButtonRelayNumber = 1, \
-	.extraButtonPulseTimeMs = 100, \
-	.extraButtonInvert = 0, \
-	.gateRelayNumber = 0, \
-	.openLimitSwitchInputNumber = 0, \
-	.closeLimitSwitchInputNumber = 1, \
-	.gateType = 0, \
-	.gatePulseTimeMs = 100, \
-	.gateInvert = 0, \
-	.inputsType = 0, \
-	.fieldsPreferences = NULL\
-};
-
-
-	// ================================================
-	//	Test Functions
-	// ================================================
-
-
-typedef struct {
-	uint8_t Val1;
-	uint8_t Val2;
-}test_struct;
-
-
-void test_func(void *pvParameters){
-
-	test_struct *initVals = (test_struct *) pvParameters;
-
-	printf("Test success? : %d , %d\n", initVals->Val1, initVals->Val2);
-
-
-
-	vTaskDelete(NULL);
-}
 
 	// ================================================
 	//	Request Functions
@@ -343,16 +234,20 @@ api_gate_state get_api_gate_state(char *json){
 static void http_get_device_state(void *pvParameters)
 {
 
+	static const char* TAG = "HTTP_GET_DEVICE_STATE";
+
 	bool sendPeriodycally = true;
 	bool readResponse = true;
 
 	char* device_ip = WEB_SERVER;
 	char* request = REQUEST;
 
-	destination_device *device = (test_struct*) pvParameters;
+	destination_device *device = (destination_device*) pvParameters;
 	device_name device_name = device->device_name;
 
 	if (device_name == gateBox) {
+
+		TAG = "HTTP_GET_GATEBOX_STATE";
 
 		if (SHOW_ALL_LOGS == true) {
 			ESP_LOGI(TAG, "Destination device: switchBox");
@@ -361,7 +256,10 @@ static void http_get_device_state(void *pvParameters)
 		device_ip = GATEBOX_HOST;
 		request = GATEBOX_REQUEST;
 
+
 	} else if (device_name == tempSensor) {
+
+		TAG = "HTTP_GET_TEMPSENSOR_STATE";
 
 		if (SHOW_ALL_LOGS == true) {
 			ESP_LOGI(TAG, "Destination device: tempSensor");
@@ -371,6 +269,8 @@ static void http_get_device_state(void *pvParameters)
 		request = TEMPSENSOR_REQUEST;
 
 	} else if (device_name == switchBox) {
+
+		TAG = "HTTP_GET_SWITCHBOX_STATE";
 
 		if (SHOW_ALL_LOGS == true) {
 			ESP_LOGI(TAG, "Destination device: switchBox");
@@ -567,19 +467,27 @@ void app_main(void) {
 	// AP server start and connect to wifi
 	ap_client_start();
 
+	// default settings
+	thermostat_params thermParams;
+	thermParams.temp_high = 52;
+	thermParams.temp_low = 48;
+	thermParams.power = true;
+
 	// http server start (for html settings)
-	http_server_start();
+	http_server_start(&thermParams);
 
 	// declare devices
 	// tempSensor
 	static destination_device temp;
 	static device_name temp_dn = tempSensor;
 	temp.device_name = temp_dn;
+	temp.data = 0;
 
 	// gateBox
 	static destination_device gate;
 	static device_name gateName = gateBox;
 	gate.device_name = gateName;
+	gate.data = 0;
 
 	// switchBox
 	static destination_device sw;
@@ -587,6 +495,7 @@ void app_main(void) {
 	static switchBox_command switchBoxCommand = ON;
 	sw.device_name = sw_dn;
 	sw.command = switchBoxCommand;
+
 
 
 	// Run thread periodically checking state of tempSensor
@@ -597,18 +506,128 @@ void app_main(void) {
 
 	while(1){
 
-		ESP_LOGI(TAG, "TempSensor: 	%.1f", temp.data);
-		ESP_LOGI(TAG, "GateBox: 	%.0f", gate.data);
+		if(thermParams.power){
 
-		/*
-		sw.command = OFF;
-		xTaskCreate(&http_get_device_state, "http_get_device_state", 4096, &sw, 5, NULL);
+			if(temp.data){
 
-		sw.command = ON;
-		xTaskCreate(&http_get_device_state, "http_get_device_state", 4096, &sw,5, NULL);
-		*/
+				if (temp.data < thermParams.temp_low) {
+					if (SHOW_MAIN_LOGS == true) {
+						ESP_LOGI(TAG, "Turning on MATSUI device");
+					}
+					if(gate.data == 50){
+						sw.command = ON;
+						xTaskCreate(&http_get_device_state, "http_get_device_state", 4096, &sw, 5, NULL);
+						vTaskDelay(1000 / portTICK_PERIOD_MS);
+						sw.command = OFF;
+						xTaskCreate(&http_get_device_state,
+								"http_get_device_state", 4096, &sw, 5, NULL);
 
-		vTaskDelay(6000 / portTICK_PERIOD_MS);
+						vTaskDelay(1000 / portTICK_PERIOD_MS);
+
+						if(gate.data != 50){
+							if (SHOW_MAIN_LOGS == true) {
+								ESP_LOGI(TAG, "MATSUI is ON!");
+							}
+						}
+						else{
+							ESP_LOGE(TAG, "MATSUI isn't ON! Try to connect MATSUI to power grid!");
+						}
+
+					}
+					else{
+						if (SHOW_MAIN_LOGS == true) {
+							ESP_LOGI(TAG, "MATSUI is already ON!");
+						}
+					}
+
+				} else if (temp.data > thermParams.temp_high) {
+					if (SHOW_MAIN_LOGS == true) {
+						ESP_LOGI(TAG, "Turning off MATSUI device");
+					}
+					if (gate.data != 50) {
+						sw.command = ON;
+						xTaskCreate(&http_get_device_state,
+								"http_get_device_state", 4096, &sw, 5, NULL);
+						vTaskDelay(1000 / portTICK_PERIOD_MS);
+						sw.command = OFF;
+						xTaskCreate(&http_get_device_state,
+								"http_get_device_state", 4096, &sw, 5, NULL);
+
+						vTaskDelay(1000 / portTICK_PERIOD_MS);
+
+						if (gate.data == 50) {
+							if (SHOW_MAIN_LOGS == true) {
+								ESP_LOGI(TAG, "MATSUI is OFF!");
+							}
+						} else {
+							ESP_LOGE(TAG,
+									"MATSUI isn't OFF! SwitchBox may be offline or damaged!");
+						}
+
+					} else {
+						if (SHOW_MAIN_LOGS == true) {
+							ESP_LOGI(TAG, "MATSUI is already OFF!");
+						}
+					}
+					sw.command = OFF;
+					xTaskCreate(&http_get_device_state, "http_get_device_state", 4096, &sw, 5, NULL);
+
+				} else {
+					if (SHOW_MAIN_LOGS == true) {
+						ESP_LOGI(TAG, "Doing nothing! Temperature is between %d and %d deg.", thermParams.temp_low, thermParams.temp_high);
+					}
+				}
+			}
+			else{
+
+			}
+
+
+			if (SHOW_ALL_LOGS == true) {
+				ESP_LOGI(TAG, "==================================================");
+				ESP_LOGI(TAG, "==================================================");
+				ESP_LOGI(TAG, "TempSensor: 	%.1f", temp.data);
+				ESP_LOGI(TAG, "GateBox: 	%.0f", gate.data);
+				ESP_LOGI(TAG, "==================================================");
+				ESP_LOGI(TAG, "==================================================");
+			}
+
+
+		}
+		else{
+			if (gate.data != 50) {
+
+				ESP_LOGW(TAG, "Truning OFF MATSUI!");
+
+				sw.command = ON;
+				xTaskCreate(&http_get_device_state, "http_get_device_state",
+						4096, &sw, 5, NULL);
+				vTaskDelay(1000 / portTICK_PERIOD_MS);
+				sw.command = OFF;
+				xTaskCreate(&http_get_device_state, "http_get_device_state",
+						4096, &sw, 5, NULL);
+
+				vTaskDelay(1000 / portTICK_PERIOD_MS);
+
+				if (gate.data == 50) {
+					if (SHOW_MAIN_LOGS == true) {
+						ESP_LOGI(TAG, "MATSUI is OFF!");
+					}
+				} else {
+					ESP_LOGE(TAG,
+							"MATSUI isn't OFF! SwitchBox may be offline or damaged!");
+				}
+
+			} else {
+				if (SHOW_MAIN_LOGS == true) {
+					ESP_LOGI(TAG, "MATSUI is already OFF!");
+				}
+			}
+
+		}
+
+
+		vTaskDelay(4000 / portTICK_PERIOD_MS);
 	}
 }
 

@@ -33,8 +33,9 @@ This can also be template for other more complicated tasks using blebox devices.
 ## TODO:
 - pass data through web page/control panel both directions (print device state)
 - add script to search for IP device 
+- device is disconnecting from grid after some time (few minutes), fix needed
 
-## Web page
+## Control panel (html page) 
 If device has successfully connected to wifi and receives IP address, <br />
 use browser and type IP address. You will see control panel of device.
   

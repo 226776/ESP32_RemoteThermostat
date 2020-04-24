@@ -64,8 +64,8 @@
 
 	// ------- 	SWITCHBOX 	-------
 #define SWITCHBOX_HOST "192.168.1.245"
-#define SWITCHBOX_ON "/s/1"
-#define SWITCHBOX_OFF "/s/0"
+#define SWITCHBOX_ON "/s/0/1"
+#define SWITCHBOX_OFF "/s/0/0"
 
 	// ================================================
 	//	Static variables
@@ -627,7 +627,7 @@ void app_main(void) {
 		}
 
 
-		vTaskDelay(4000 / portTICK_PERIOD_MS);
+		vTaskDelay(30000 / portTICK_PERIOD_MS);
 	}
 }
 

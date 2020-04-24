@@ -18,22 +18,24 @@ This can also be template for other more complicated tasks using blebox devices.
 ## Done 
 - Start access point, connect to local wi-fi (handled by default event loop)
 - Start new thread
-- Send request url 
-- Get request response
+- Send request url
+- Get request response	
 - Phrase response json 
-- Multithreading
+- Multithreading 
 - GateBox state read
 - TempSensor state read
 - SwitchBox command send
 - http server
 - html web page send as http response 
+- pass data through control panel (browser) to device
+- thermostat function
 
 ## TODO:
-- pass data through web page
-- create main thermostat function 
+- pass data through web page/control panel both directions (print device state)
+- add script to search for IP device 
 
 ## Web page
-If device has successfully connected to wifi and receives IP address, <br /> type on any local device (connected to same local network) using browser:
-<br />__http://\<IP\>/hello__
+If device has successfully connected to wifi and receives IP address, <br />
+use browser and type IP address. You will see control panel of device.
   
 ![Image description](images/webPage_view.png)

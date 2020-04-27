@@ -15,6 +15,9 @@ This can also be template for other more complicated tasks using blebox devices.
 ## Project info
 - Software: Eclipse (with ESP32 Dev plugins) 
 
+## Network Diagram 
+![Image description](images/NetSchem.png)
+
 ## Done 
 - Start access point, connect to local wi-fi (handled by default event loop)
 - Start new thread

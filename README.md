@@ -28,15 +28,16 @@ This can also be template for other more complicated tasks using blebox devices.
 - GateBox state read
 - TempSensor state read
 - SwitchBox command send
-- http server
-- html web page send as http response 
-- pass data through control panel (browser) to device
-- thermostat function
+- Http server
+- Html web page (control panel) send as http response 
+- Pass data through control panel (browser) to device
+- Thermostat function
 
 ## TODO:
-- pass data through web page/control panel both directions (print device state)
-- add script to search for IP device 
-- device is disconnecting from grid after some time (few minutes), fix needed
+- Pass data through web page/control panel both directions (print device state)
+- Add script to search for IP device 
+- Device is disconnecting from grid after some time (few minutes), fix needed
+- Save device parameters, and write them after device restart
 
 ## Control panel (html page) 
 If device has successfully connected to wifi and receives IP address, <br />

@@ -19,6 +19,17 @@ This can also be template for other more complicated tasks using blebox devices.
 - Programmer: RS323 Converter 
 - Debugging tools: terminal + 3 stage logs (info, warning, error)  
 
+## Responsibilities 
+Anita Grontman: 
+  - Project managment
+  - Control panel (html)
+  - Json parsing 
+  
+Krystian Kasprów: 
+  - All things related to servers on RTOS
+  - Debugging
+
+
 ## Network Diagram 
 ![Image description](images/NetSchem.png)
 

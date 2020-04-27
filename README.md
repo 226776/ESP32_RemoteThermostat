@@ -14,6 +14,10 @@ This can also be template for other more complicated tasks using blebox devices.
 
 ## Project info
 - Software: Eclipse (with ESP32 Dev plugins) 
+- Framework: ESP-IDF - Espressif IoT Development Framework
+- Device system: FreeRTOS
+- Programmer: RS323 Converter 
+- Debugging tools: terminal + 3 stage logs (info, warning, error)  
 
 ## Network Diagram 
 ![Image description](images/NetSchem.png)

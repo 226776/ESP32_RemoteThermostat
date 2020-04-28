@@ -54,6 +54,9 @@ Krystian Kasprów:
 - Device is disconnecting from grid after some time (few minutes), fix needed
 - Save device parameters, and write them after device restart
 
+## Programm Diagram 
+![Image description](images/ProgrammDiagram.png)
+
 ## Control panel (html page) 
 If device has successfully connected to wifi and receives IP address, <br />
 use browser and type IP address. You will see control panel of device.

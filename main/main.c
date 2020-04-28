@@ -541,6 +541,8 @@ void app_main(void) {
 
 	vTaskDelay(5000 / portTICK_PERIOD_MS);
 
+	xTaskCreate(&ESP_restart, "ESP_restart", 1024, NULL, 5, NULL);
+
 	while(1){
 
 		if(thermParams.power){
@@ -673,7 +675,7 @@ void app_main(void) {
 
 		vTaskDelay(10000 / portTICK_PERIOD_MS);
 
-		xTaskCreate(&ESP_restart, "ESP_restart", 1024, NULL, 5, NULL);
+
 	}
 }
 

@@ -100,6 +100,43 @@ static const char *SWITCHBOX_OFF_REQUEST = "GET " SWITCHBOX_OFF " HTTP/1.1\r\n"
     "\r\n";
 
 
+
+// ================================================
+//	AP reconnect function
+// ================================================
+
+void ESP_restart(void *pvParameters){
+
+	vTaskDelay(500000 / portTICK_PERIOD_MS);
+
+	esp_restart();
+
+}
+
+
+	// ================================================
+	//	AP reconnect function
+	// ================================================
+
+void AP_reconnect(){
+
+	static const char *TAG = "AP_RECONNECT";
+
+
+	ESP_LOGI(TAG, "User disconnect!");
+
+	esp_wifi_disconnect();
+
+	vTaskDelay(1000 / portTICK_PERIOD_MS);
+
+	ESP_LOGI(TAG, "User reconnect process!");
+
+	esp_wifi_connect();
+
+	//vTaskDelete(NULL);
+}
+
+
 	// ================================================
 	//	Request Functions
 	// ================================================
@@ -247,7 +284,6 @@ static void http_get_device_state(void *pvParameters)
 
 	if (device_name == gateBox) {
 
-		TAG = "HTTP_GET_GATEBOX_STATE";
 
 		if (SHOW_ALL_LOGS == true) {
 			ESP_LOGI(TAG, "Destination device: switchBox");
@@ -259,7 +295,6 @@ static void http_get_device_state(void *pvParameters)
 
 	} else if (device_name == tempSensor) {
 
-		TAG = "HTTP_GET_TEMPSENSOR_STATE";
 
 		if (SHOW_ALL_LOGS == true) {
 			ESP_LOGI(TAG, "Destination device: tempSensor");
@@ -270,7 +305,6 @@ static void http_get_device_state(void *pvParameters)
 
 	} else if (device_name == switchBox) {
 
-		TAG = "HTTP_GET_SWITCHBOX_STATE";
 
 		if (SHOW_ALL_LOGS == true) {
 			ESP_LOGI(TAG, "Destination device: switchBox");
@@ -458,6 +492,7 @@ static void http_get_device_state(void *pvParameters)
 
 
 
+
 	// ================================================
 	//	APP MAIN
 	// ================================================
@@ -504,6 +539,8 @@ void app_main(void) {
 	xTaskCreate(&http_get_device_state, "http_get_device_state", 4096, &gate, 5, NULL);
 
 
+	vTaskDelay(5000 / portTICK_PERIOD_MS);
+
 	while(1){
 
 		if(thermParams.power){
@@ -515,13 +552,17 @@ void app_main(void) {
 						ESP_LOGI(TAG, "Turning on MATSUI device");
 					}
 					if(gate.data == 50){
+						// make sure the siwtchBoxDC is in OFF position
+						sw.command = OFF;
+						xTaskCreate(&http_get_device_state, "http_get_device_state", 4096, &sw, 5, NULL);
+						vTaskDelay(1000 / portTICK_PERIOD_MS);
+
 						sw.command = ON;
 						xTaskCreate(&http_get_device_state, "http_get_device_state", 4096, &sw, 5, NULL);
 						vTaskDelay(1000 / portTICK_PERIOD_MS);
-						sw.command = OFF;
-						xTaskCreate(&http_get_device_state,
-								"http_get_device_state", 4096, &sw, 5, NULL);
 
+						sw.command = OFF;
+						xTaskCreate(&http_get_device_state, "http_get_device_state", 4096, &sw, 5, NULL);
 						vTaskDelay(1000 / portTICK_PERIOD_MS);
 
 						if(gate.data != 50){
@@ -545,14 +586,17 @@ void app_main(void) {
 						ESP_LOGI(TAG, "Turning off MATSUI device");
 					}
 					if (gate.data != 50) {
-						sw.command = ON;
-						xTaskCreate(&http_get_device_state,
-								"http_get_device_state", 4096, &sw, 5, NULL);
-						vTaskDelay(1000 / portTICK_PERIOD_MS);
+						// make sure the siwtchBoxDC is in OFF position
 						sw.command = OFF;
-						xTaskCreate(&http_get_device_state,
-								"http_get_device_state", 4096, &sw, 5, NULL);
+						xTaskCreate(&http_get_device_state, "http_get_device_state", 4096, &sw, 5, NULL);
+						vTaskDelay(1000 / portTICK_PERIOD_MS);
 
+						sw.command = ON;
+						xTaskCreate(&http_get_device_state, "http_get_device_state", 4096, &sw, 5, NULL);
+						vTaskDelay(1000 / portTICK_PERIOD_MS);
+
+						sw.command = OFF;
+						xTaskCreate(&http_get_device_state, "http_get_device_state", 4096, &sw, 5, NULL);
 						vTaskDelay(1000 / portTICK_PERIOD_MS);
 
 						if (gate.data == 50) {
@@ -627,7 +671,9 @@ void app_main(void) {
 		}
 
 
-		vTaskDelay(30000 / portTICK_PERIOD_MS);
+		vTaskDelay(10000 / portTICK_PERIOD_MS);
+
+		xTaskCreate(&ESP_restart, "ESP_restart", 1024, NULL, 5, NULL);
 	}
 }
 

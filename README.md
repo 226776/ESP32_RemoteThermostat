@@ -2,8 +2,8 @@
 Remote thermostat using blebox devices working on ESP32. 
 
 ## Autors
-- Krystian Kasprów
-- Anita Grontman
+- Krystian Kasprów (226776) 
+- Anita Grontman (226752)
 
 ## Project Description
 
@@ -14,6 +14,24 @@ This can also be template for other more complicated tasks using blebox devices.
 
 ## Project info
 - Software: Eclipse (with ESP32 Dev plugins) 
+- Framework: ESP-IDF - Espressif IoT Development Framework
+- Device system: FreeRTOS
+- Programmer: RS323 Converter 
+- Debugging tools: terminal + 3 stage logs (info, warning, error)  
+
+## Responsibilities 
+Anita Grontman: 
+  - Project managment
+  - Control panel (html)
+  - Json parsing 
+  
+Krystian Kasprów: 
+  - All things related to servers on RTOS
+  - Debugging
+
+
+## Network Diagram 
+![Image description](images/NetSchem.png)
 
 ## Done 
 - Start access point, connect to local wi-fi (handled by default event loop)
@@ -25,16 +43,18 @@ This can also be template for other more complicated tasks using blebox devices.
 - GateBox state read
 - TempSensor state read
 - SwitchBox command send
-- http server
-- html web page send as http response 
-- pass data through control panel (browser) to device
-- thermostat function
+- Http server
+- Html web page (control panel) send as http response 
+- Pass data through control panel (browser) to device
+- Thermostat function
 
 ## TODO:
-- pass data through web page/control panel both directions (print device state)
-- add script to search for IP device 
+- Pass data through web page/control panel both directions (print device state)
+- Add script to search for IP device 
+- Device is disconnecting from grid after some time (few minutes), fix needed
+- Save device parameters, and write them after device restart
 
-## Web page
+## Control panel (html page) 
 If device has successfully connected to wifi and receives IP address, <br />
 use browser and type IP address. You will see control panel of device.
   

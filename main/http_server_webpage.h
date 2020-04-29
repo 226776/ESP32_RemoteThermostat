@@ -28,7 +28,62 @@
 	//		HTTP Server Services / WebPage
 	// ================================================
 
+static esp_err_t send_thermostat_state_handler(httpd_req_t *req){
 
+	thermostat_state *thermState = (thermostat_state*)req->user_ctx;
+	destination_device *tempSensor = (destination_device*)thermState->tempSensor;
+	destination_device *gateBox = (destination_device*)thermState->gateBox;
+	thermostat_params *thermParams = (thermostat_params*)thermState->thermParams;
+
+	cJSON *root;
+
+	root = cJSON_CreateObject();
+
+	cJSON_AddItemToObject(root, "Current Temperature", cJSON_CreateNumber((double)tempSensor->data));
+	if(gateBox->data != 50){
+		cJSON_AddItemToObject(root, "Current MATSUI state", cJSON_CreateString("ON"));
+	}
+	else{
+		cJSON_AddItemToObject(root, "Current MATSUI state", cJSON_CreateString("OFF"));
+	}
+	if(thermParams->power){
+		cJSON_AddItemToObject(root, "Current Power Setting", cJSON_CreateString("ON"));
+	}
+	else{
+		cJSON_AddItemToObject(root, "Current Power Setting", cJSON_CreateString("OFF"));
+	}
+	cJSON_AddItemToObject(root, "High Temperature Threshold", cJSON_CreateNumber((double)thermParams->temp_high));
+	cJSON_AddItemToObject(root, "Low Temperature Threshold", cJSON_CreateNumber((double)thermParams->temp_low));
+
+	uint32_t freeHeap = xPortGetFreeHeapSize();
+	cJSON_AddItemToObject(root, "Free Heap Size", cJSON_CreateNumber((double)freeHeap));
+
+
+	char* resp_str = cJSON_Print(root);
+
+
+
+	//sprintf(resp_str, "<html><h1>Thermostat State:<\h1><\html> \n Current Temperature %.1f \n ",tempSensor->data);
+	httpd_resp_send(req, resp_str, strlen(resp_str));
+
+
+	cJSON_Delete(root);
+	free(resp_str);
+
+	return ESP_OK;
+}
+
+
+
+
+httpd_uri_t send_thermostat_state = {
+    .uri       = "/state",
+    .method    = HTTP_GET,
+    .handler   = send_thermostat_state_handler,
+    /* Let's pass response string in user
+     * context to demonstrate it's usage */
+    .user_ctx  = NULL
+};
 
 
 //	************** 	Set Off thermostat		**************
@@ -365,7 +420,11 @@ esp_err_t http_404_error_handler(httpd_req_t *req, httpd_err_code_t err)
 static httpd_handle_t start_webserver(void *pvParameters)
 {
 
-	thermostat_params *thermParams = (thermostat_params*)pvParameters;
+	thermostat_state *thermState = (thermostat_state*)pvParameters;
+	send_thermostat_state.user_ctx = thermState;
+
+
+	thermostat_params *thermParams = (thermostat_params*)thermState->thermParams;
 	set_temp_high.user_ctx = thermParams;
 	set_temp_low.user_ctx = thermParams;
 	set_off_thermostat.user_ctx = thermParams;
@@ -387,6 +446,7 @@ static httpd_handle_t start_webserver(void *pvParameters)
         httpd_register_uri_handler(server, &set_off_thermostat);
         httpd_register_uri_handler(server, &set_on_thermostat);
         httpd_register_uri_handler(server, &echo);
+        httpd_register_uri_handler(server, &send_thermostat_state);
         return server;
     }
 

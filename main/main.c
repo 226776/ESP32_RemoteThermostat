@@ -495,10 +495,14 @@ void app_main(void) {
 	sw.device_name = sw_dn;
 	sw.command = switchBoxCommand;
 
-	//thermostat_state
+	//	thermostat_state
+	thermostat_state thermState;
+	thermState.tempSensor = &temp;
+	thermState.gateBox = &gate;
+	thermState.thermParams = &thermParams;
 
 	// http server start (for html settings)
-	http_server_start(&thermParams);
+	http_server_start(&thermState);
 
 
 

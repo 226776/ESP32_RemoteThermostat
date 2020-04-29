@@ -33,9 +33,10 @@ typedef struct {
 }destination_device;
 
 typedef struct {
-	uint8_t temp_high;
-	uint8_t temp_low;
-	bool 	power;
+	uint8_t 	temp_high;
+	uint8_t 	temp_low;
+	bool 		power;
+	uint16_t 	restart_count;
 }thermostat_params;
 
 
@@ -97,6 +98,12 @@ typedef struct {
 	.inputsType = 0, \
 	.fieldsPreferences = NULL\
 };
+
+typedef struct {
+	destination_device*	tempSensor;
+	destination_device* gateBox;
+	thermostat_params* thermParams;
+} thermostat_state;
 
 
 #endif

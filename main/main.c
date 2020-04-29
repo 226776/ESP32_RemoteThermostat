@@ -21,6 +21,7 @@
 #include "ap_client.h"
 #include "http_server_webpage.h"
 #include "typedefs.h"
+#include "thermostat_params_nvs_operations.h"
 
 
 #define SHOW_ALL_LOGS false
@@ -459,6 +460,7 @@ static void http_get_device_state(void *pvParameters)
 
 
 
+
 	// ================================================
 	//	APP MAIN
 	// ================================================
@@ -468,14 +470,10 @@ void app_main(void) {
 	// AP server start and connect to wifi
 	ap_client_start();
 
-	// default settings
-	thermostat_params thermParams;
-	thermParams.temp_high = 52;
-	thermParams.temp_low = 48;
-	thermParams.power = true;
 
-	// http server start (for html settings)
-	http_server_start(&thermParams);
+	thermostat_params thermParams;
+	update_thermostat_params_nvs_flash(&thermParams, true);
+
 
 	// declare devices
 	// tempSensor
@@ -496,6 +494,11 @@ void app_main(void) {
 	static switchBox_command switchBoxCommand = ON;
 	sw.device_name = sw_dn;
 	sw.command = switchBoxCommand;
+
+	//thermostat_state
+
+	// http server start (for html settings)
+	http_server_start(&thermParams);
 
 
 

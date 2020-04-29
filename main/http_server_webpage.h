@@ -21,6 +21,7 @@
 
 #include "web_page.h"
 #include "typedefs.h"
+#include "thermostat_params_nvs_operations.h"
 
 
 	// ================================================
@@ -39,6 +40,8 @@ static esp_err_t set_off_thermostat_handler(httpd_req_t *req){
 	thermostat_params *thermParams = (thermostat_params*) req->user_ctx;
 
 	thermParams->power = false;
+
+	update_thermostat_params_nvs_flash(thermParams, false);
 
 	ESP_LOGW(HTTP_SERVER_TAG, "Turning thermostat OFF!");
 
@@ -64,6 +67,8 @@ static esp_err_t set_on_thermostat_handler(httpd_req_t *req){
 		thermostat_params *thermParams = (thermostat_params*) req->user_ctx;
 
 		thermParams->power = true;
+
+		update_thermostat_params_nvs_flash(thermParams, false);
 
 		ESP_LOGW(HTTP_SERVER_TAG, "Turning thermostat ON!");
 
@@ -111,6 +116,8 @@ static esp_err_t set_temp_low_handler(httpd_req_t *req){
 
 		if (temp <= thermParams->temp_high) {
 			thermParams->temp_low = (uint8_t)temp;
+
+			update_thermostat_params_nvs_flash(thermParams, false);
 
 			ESP_LOGI(HTTP_SERVER_TAG, "Setting up Temp High to : %.0f", temp);
 
@@ -166,6 +173,8 @@ static esp_err_t set_temp_high_handler(httpd_req_t *req){
 		thermostat_params *thermParams = (thermostat_params*) req->user_ctx;
 		if(temp >= thermParams->temp_low){
 			thermParams->temp_high = (uint8_t)temp;
+
+			update_thermostat_params_nvs_flash(thermParams, false);
 
 			ESP_LOGI(HTTP_SERVER_TAG, "Setting up Temp Low to : %.0f", temp);
 

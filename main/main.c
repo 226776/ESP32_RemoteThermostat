@@ -101,47 +101,11 @@ static const char *SWITCHBOX_OFF_REQUEST = "GET " SWITCHBOX_OFF " HTTP/1.1\r\n"
 
 
 
-// ================================================
-//	AP reconnect function
-// ================================================
-
-void ESP_restart(void *pvParameters){
-
-	vTaskDelay(500000 / portTICK_PERIOD_MS);
-
-	esp_restart();
-
-}
-
-
-	// ================================================
-	//	AP reconnect function
-	// ================================================
-
-void AP_reconnect(){
-
-	static const char *TAG = "AP_RECONNECT";
-
-
-	ESP_LOGI(TAG, "User disconnect!");
-
-	esp_wifi_disconnect();
-
-	vTaskDelay(1000 / portTICK_PERIOD_MS);
-
-	ESP_LOGI(TAG, "User reconnect process!");
-
-	esp_wifi_connect();
-
-	//vTaskDelete(NULL);
-}
-
-
 	// ================================================
 	//	Request Functions
 	// ================================================
 
-char* getJsonFromResponse(char *response, uint16_t response_length){
+char* getJsonFromResponse_malloc(char *response, uint16_t response_length){
 
 		uint16_t json_begin = 0;
 		uint16_t json_end = 0;
@@ -434,12 +398,13 @@ static void http_get_device_state(void *pvParameters)
 
 			// =============================================================================================
 
-			json = getJsonFromResponse(resoponse, (uint16_t) EXPECTED_MAX_RESPONSE_LENGTH);
+			json = getJsonFromResponse_malloc(resoponse, (uint16_t) EXPECTED_MAX_RESPONSE_LENGTH);
 
 
 			if (device_name == gateBox) {
 
 				api_gate_state gatebox_state = get_api_gate_state(json);
+				free(json);
 
 				device->data = gatebox_state.currentPos;
 
@@ -453,6 +418,7 @@ static void http_get_device_state(void *pvParameters)
 			} else if (device_name == tempSensor) {
 
 				api_tempsensor_state_tempSensor_sensors_0 api_tempsensor_state = get_api_tempensor_state(json);
+				free(json);
 
 				float temperature = ((float )api_tempsensor_state.value) / 100;
 
@@ -541,7 +507,6 @@ void app_main(void) {
 
 	vTaskDelay(5000 / portTICK_PERIOD_MS);
 
-	xTaskCreate(&ESP_restart, "ESP_restart", 1024, NULL, 5, NULL);
 
 	while(1){
 
@@ -672,6 +637,8 @@ void app_main(void) {
 
 		}
 
+		uint32_t freeHeap = xPortGetFreeHeapSize();
+		ESP_LOGI(TAG, "Free heap size: %d", freeHeap);
 
 		vTaskDelay(10000 / portTICK_PERIOD_MS);
 

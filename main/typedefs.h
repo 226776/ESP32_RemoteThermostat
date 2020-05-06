@@ -25,9 +25,10 @@ typedef enum {
 
 typedef struct {
 	uint8_t 	device_name;
-	uint8_t*	ip;
-	uint8_t 	command;
-	uint8_t 	command_type;
+	char*		ip;
+	char*		request;
+	char*		command;
+	uint8_t 	request_len;
 	float 		data;
 
 }destination_device;

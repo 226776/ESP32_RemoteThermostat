@@ -65,8 +65,8 @@
 
 	// ------- 	SWITCHBOX 	-------
 #define SWITCHBOX_HOST "192.168.1.245"
-#define SWITCHBOX_ON "/s/0/1"
-#define SWITCHBOX_OFF "/s/0/0"
+#define SWITCHBOX_ON "/s/1"
+#define SWITCHBOX_OFF "/s/0"
 
 	// ================================================
 	//	Static variables
@@ -105,6 +105,30 @@ static const char *SWITCHBOX_OFF_REQUEST = "GET " SWITCHBOX_OFF " HTTP/1.1\r\n"
 	// ================================================
 	//	Request Functions
 	// ================================================
+
+void setRequestString_malloc(destination_device *device){
+
+	char *TAG = "setRequestString_malloc";
+
+	if(device->request != NULL){
+		ESP_LOGI(TAG, "Free alokated memory!");
+		free(device->request);
+	}
+
+	char temp[128];
+
+	device->request_len = sprintf(temp, "GET %s HTTP/1.1\r\n"
+										"Host: %s:80\r\n"
+										"User-Agent: esp-idf/1.1 esp32\r\n"
+										"\r\n", device->command, device->ip);
+
+	device->request = malloc(device->request_len);
+
+	for(uint8_t i = 0; i < device->request_len; i++){
+		device->request[i] = temp[i];
+	}
+
+}
 
 char* getJsonFromResponse_malloc(char *response, uint16_t response_length){
 
@@ -233,7 +257,7 @@ api_gate_state get_api_gate_state(char *json){
 }
 
 
-static void http_get_device_state(void *pvParameters)
+void http_get_device_state(void *pvParameters)
 {
 
 	static const char* TAG = "HTTP_GET_DEVICE_STATE";
@@ -457,8 +481,105 @@ static void http_get_device_state(void *pvParameters)
 
 }
 
+void http_send_device_command(void *pvParameters)
+{
+
+	static const char* TAG = "HTTP_GET_DEVICE_STATE";
 
 
+	destination_device *device = (destination_device*) pvParameters;
+	device_name device_name = device->device_name;
+
+
+	if (device_name == switchBox) {
+
+		if (SHOW_ALL_LOGS == true) {
+			ESP_LOGI(TAG, "Destination device: switchBox");
+		}
+
+		const struct addrinfo hints = {
+		        .ai_family = AF_INET,
+		        .ai_socktype = SOCK_STREAM
+		};
+
+		struct addrinfo *res;
+		struct in_addr *addr;
+		int s;
+
+		int err = getaddrinfo(device->ip, WEB_PORT, &hints, &res);
+
+		if (err != 0 || res == NULL) {
+			ESP_LOGE(TAG, "DNS lookup failed err=%d res=%p", err, res);
+			vTaskDelay(1000 / portTICK_PERIOD_MS);
+		}
+
+		/* Code to print the resolved IP.
+
+		 Note: inet_ntoa is non-reentrant, look at ipaddr_ntoa_r for "real" code */
+		addr = &((struct sockaddr_in*) res->ai_addr)->sin_addr;
+		if (SHOW_ALL_LOGS == true) {
+			ESP_LOGI(TAG, "DNS lookup succeeded. IP=%s", inet_ntoa(*addr));
+		}
+
+		s = socket(res->ai_family, res->ai_socktype, 0);
+		if (s < 0) {
+			ESP_LOGE(TAG, "... Failed to allocate socket.");
+			freeaddrinfo(res);
+			vTaskDelay(1000 / portTICK_PERIOD_MS);
+		}
+
+		if (SHOW_ALL_LOGS == true) {
+			ESP_LOGI(TAG, "... allocated socket");
+		}
+
+		if (connect(s, res->ai_addr, res->ai_addrlen) != 0) {
+			ESP_LOGE(TAG, "... socket connect failed errno=%d", errno);
+			close(s);
+			freeaddrinfo(res);
+			vTaskDelay(4000 / portTICK_PERIOD_MS);
+		}
+
+		if (SHOW_ALL_LOGS == true) {
+			ESP_LOGI(TAG, "... connected");
+		}
+
+		freeaddrinfo(res);
+
+		if (write(s, device->request, device->request_len) < 0) {
+			ESP_LOGE(TAG, "... socket send failed");
+			close(s);
+			vTaskDelay(4000 / portTICK_PERIOD_MS);
+		}
+
+		if (SHOW_ALL_LOGS == true) {
+			ESP_LOGI(TAG, "... socket send success");
+		}
+
+		close(s);
+
+	}
+	else {
+		ESP_LOGE(TAG, "Not supported!");
+	}
+}
+
+
+void switchbox_action(destination_device *switchBox_device, switchBox_command sc){
+
+	if(switchBox_device->device_name == switchBox){
+		if (sc == ON) {
+			switchBox_device->command = SWITCHBOX_ON;
+		} else {
+			switchBox_device->command = SWITCHBOX_OFF;
+		}
+		setRequestString_malloc(switchBox_device);
+		http_send_device_command(switchBox_device);
+
+	}else{
+		ESP_LOGE(TAG, "This device has no actions yet!");
+	}
+
+}
 
 
 	// ================================================
@@ -473,7 +594,7 @@ void app_main(void) {
 
 	thermostat_params thermParams;
 	update_thermostat_params_nvs_flash(&thermParams, true);
-
+	thermParams.power = false;
 
 	// declare devices
 	// tempSensor
@@ -481,19 +602,26 @@ void app_main(void) {
 	static device_name temp_dn = tempSensor;
 	temp.device_name = temp_dn;
 	temp.data = 0;
+	temp.ip = TEMPSENSOR_HOST;
+	temp.command = TEMPSENSOR_STATE;
+	setRequestString_malloc(&temp);
 
 	// gateBox
 	static destination_device gate;
 	static device_name gateName = gateBox;
 	gate.device_name = gateName;
-	gate.data = 0;
+	gate.data = 50;
+	gate.ip = GATEBOX_HOST;
+	gate.command = GATEBOX_STATE;
+	setRequestString_malloc(&gate);
+
+
 
 	// switchBox
 	static destination_device sw;
 	static device_name sw_dn = switchBox;
-	static switchBox_command switchBoxCommand = ON;
+	sw.ip = SWITCHBOX_HOST;
 	sw.device_name = sw_dn;
-	sw.command = switchBoxCommand;
 
 	//	thermostat_state
 	thermostat_state thermState;
@@ -507,9 +635,9 @@ void app_main(void) {
 
 
 	// Run thread periodically checking state of tempSensor
-	xTaskCreate(&http_get_device_state, "http_get_device_state", 4096, &temp, 5, NULL);
+	//xTaskCreate(&http_get_device_state, "http_get_device_state", 4096, &temp, 5, NULL);
 	// Run thread periodically checking state of gateBox
-	xTaskCreate(&http_get_device_state, "http_get_device_state", 4096, &gate, 5, NULL);
+	//xTaskCreate(&http_get_device_state, "http_get_device_state", 4096, &gate, 5, NULL);
 
 
 	vTaskDelay(5000 / portTICK_PERIOD_MS);
@@ -597,7 +725,7 @@ void app_main(void) {
 				}
 			}
 			else{
-
+				ESP_LOGI(TAG, "==================================================");
 			}
 
 
@@ -613,34 +741,16 @@ void app_main(void) {
 
 		}
 		else{
-			if (gate.data != 50) {
 
-				ESP_LOGW(TAG, "Truning OFF MATSUI!");
+			ESP_LOGI(TAG, "TEST LOOP");
 
-				sw.command = ON;
-				xTaskCreate(&http_get_device_state, "http_get_device_state",
-						4096, &sw, 5, NULL);
-				vTaskDelay(1000 / portTICK_PERIOD_MS);
-				sw.command = OFF;
-				xTaskCreate(&http_get_device_state, "http_get_device_state",
-						4096, &sw, 5, NULL);
+			switchbox_action(&sw, ON);
 
-				vTaskDelay(1000 / portTICK_PERIOD_MS);
+			vTaskDelay(500 / portTICK_PERIOD_MS);
 
-				if (gate.data == 50) {
-					if (SHOW_MAIN_LOGS == true) {
-						ESP_LOGI(TAG, "MATSUI is OFF!");
-					}
-				} else {
-					ESP_LOGE(TAG,
-							"MATSUI isn't OFF! SwitchBox may be offline or damaged!");
-				}
+			switchbox_action(&sw, OFF);
 
-			} else {
-				if (SHOW_MAIN_LOGS == true) {
-					ESP_LOGI(TAG, "MATSUI is already OFF!");
-				}
-			}
+
 
 		}
 

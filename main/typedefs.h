@@ -26,18 +26,26 @@ typedef enum {
 typedef struct {
 	uint8_t 	device_name;
 	char*		ip;
-	char*		request;
 	char*		command;
+	char*		request;
 	uint8_t 	request_len;
+	uint32_t	period;
 	float 		data;
-
+	bool 		data_received;
 }destination_device;
 
 typedef struct {
+	char 		*ip;
 	uint8_t 	temp_high;
 	uint8_t 	temp_low;
+	uint8_t 	temp_fuse_low;
+	uint8_t 	temp_fuse_high;
 	bool 		power;
+	bool 		isFreezing;
 	uint16_t 	restart_count;
+	uint32_t	period;
+	char 		*controlPanelHTML;
+	uint16_t	controlPanelHTML_len;
 }thermostat_params;
 
 
@@ -101,9 +109,11 @@ typedef struct {
 };
 
 typedef struct {
-	destination_device*	tempSensor;
-	destination_device* gateBox;
-	thermostat_params* thermParams;
+	destination_device	*tempSensor_main;
+	destination_device	*tempSensor_fuse;
+	destination_device	*switchBox_compressor;
+	destination_device	*switchBox_fan;
+	thermostat_params	*thermParams;
 } thermostat_state;
 
 

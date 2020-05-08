@@ -69,10 +69,15 @@ void update_thermostat_params_nvs_flash(thermostat_params *thermParams, bool rea
 			if(read){
 				// Read
 
-				// default values (if not
+				// default values (if there are no in memory)
 				thermParams->temp_high = 52;
 				thermParams->temp_low = 48;
 				thermParams->power = true;
+				thermParams->isFreezing = false;
+				thermParams->period = 8000;
+				thermParams->temp_fuse_high = 7;
+				thermParams->temp_fuse_low = 2;
+
 
 				err = nvs_get_u8(my_nvs_handle, "temp_high", &thermParams->temp_high);
 				read_error_check(err);
@@ -81,6 +86,15 @@ void update_thermostat_params_nvs_flash(thermostat_params *thermParams, bool rea
 				read_error_check(err);
 
 				err = nvs_get_u8(my_nvs_handle, "power", &thermParams->power);
+				read_error_check(err);
+
+				err = nvs_get_u32(my_nvs_handle, "period", &thermParams->period);
+				read_error_check(err);
+
+				err = nvs_get_u8(my_nvs_handle, "temp_fuse_high", &thermParams->temp_fuse_high);
+				read_error_check(err);
+
+				err = nvs_get_u8(my_nvs_handle, "temp_fuse_low", &thermParams->temp_fuse_low);
 				read_error_check(err);
 
 				if (THERMOSTAT_PARAMS_NVS_OPERATIONS_SHOW_LOGS) {
@@ -110,6 +124,17 @@ void update_thermostat_params_nvs_flash(thermostat_params *thermParams, bool rea
 
 				err = nvs_set_u8(my_nvs_handle, "power",
 						thermParams->power);
+				read_error_check(err);
+
+				err = nvs_set_u8(my_nvs_handle, "period", thermParams->period);
+				read_error_check(err);
+
+				err = nvs_set_u8(my_nvs_handle, "temp_fuse_high",
+					thermParams->temp_fuse_high);
+				read_error_check(err);
+
+				err = nvs_set_u8(my_nvs_handle, "temp_fuse_low",
+					thermParams->temp_fuse_low);
 				read_error_check(err);
 
 

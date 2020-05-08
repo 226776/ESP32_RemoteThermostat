@@ -9,17 +9,28 @@
 #include "esp_eth.h"
 #include "freertos/event_groups.h"
 
+	// ================================================
+	//	AP client definitions (default)
+	// ================================================
+
+
 // This contains my wifi data, if you don't have it simply type values in AP client definitions section
 #include "wifi_pass.h"
 
 
+#ifndef WIFI_SSID
+	// Put your SSID
+#define	WIFI_SSID "majesiec"
+
+	// Put your PASSWORD
+#define	WIFI_PASS "youpassword"
+
+	// Put max retrys
+#define	MAXIMUM_RETRY 5
+#endif
+
+
 static const char *AP_CLIENT_TAG = "AP CLIENT";
-
-
-	// ================================================
-	//	AP client handlers / Init
-	// ================================================
-
 
 
 /* FreeRTOS event group to signal when we are connected*/

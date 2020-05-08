@@ -30,22 +30,31 @@
 
 static esp_err_t send_thermostat_state_handler(httpd_req_t *req){
 
+	if (req->user_ctx == NULL) return ESP_FAIL;
+
 	thermostat_state *thermState = (thermostat_state*)req->user_ctx;
-	destination_device *tempSensor = (destination_device*)thermState->tempSensor;
-	destination_device *gateBox = (destination_device*)thermState->gateBox;
+
+	if (thermState == NULL) return ESP_FAIL;
+
+	destination_device *tempSensor_main = (destination_device*)thermState->tempSensor_main;
+
+	if (tempSensor_main == NULL) return ESP_FAIL;
+
+	destination_device *tempSensor_fuse = (destination_device*)thermState->tempSensor_fuse;
+
+	if (tempSensor_fuse == NULL) return ESP_FAIL;
+
 	thermostat_params *thermParams = (thermostat_params*)thermState->thermParams;
+
+	if (thermParams == NULL) return ESP_FAIL;
 
 	cJSON *root;
 
 	root = cJSON_CreateObject();
 
-	cJSON_AddItemToObject(root, "Current Temperature", cJSON_CreateNumber((double)tempSensor->data));
-	if(gateBox->data != 50){
-		cJSON_AddItemToObject(root, "Current MATSUI state", cJSON_CreateString("ON"));
-	}
-	else{
-		cJSON_AddItemToObject(root, "Current MATSUI state", cJSON_CreateString("OFF"));
-	}
+	cJSON_AddItemToObject(root, "Current FridgeOven Temperature", cJSON_CreateNumber((double)tempSensor_main->data));
+	cJSON_AddItemToObject(root, "Current Fuse Temperature", cJSON_CreateNumber((double)tempSensor_fuse->data));
+
 	if(thermParams->power){
 		cJSON_AddItemToObject(root, "Current Power Setting", cJSON_CreateString("ON"));
 	}
@@ -54,6 +63,9 @@ static esp_err_t send_thermostat_state_handler(httpd_req_t *req){
 	}
 	cJSON_AddItemToObject(root, "High Temperature Threshold", cJSON_CreateNumber((double)thermParams->temp_high));
 	cJSON_AddItemToObject(root, "Low Temperature Threshold", cJSON_CreateNumber((double)thermParams->temp_low));
+	cJSON_AddItemToObject(root, "High Fuse Temperature Threshold", cJSON_CreateNumber((double)thermParams->temp_fuse_high));
+	cJSON_AddItemToObject(root, "Low Fuse Temperature Threshold", cJSON_CreateNumber((double)thermParams->temp_fuse_low));
+	cJSON_AddItemToObject(root, "Main Thread Period", cJSON_CreateNumber((double)thermParams->period));
 
 	uint32_t freeHeap = xPortGetFreeHeapSize();
 	cJSON_AddItemToObject(root, "Free Heap Size", cJSON_CreateNumber((double)freeHeap));
@@ -62,8 +74,6 @@ static esp_err_t send_thermostat_state_handler(httpd_req_t *req){
 	char* resp_str = cJSON_Print(root);
 
 
-
-	//sprintf(resp_str, "<html><h1>Thermostat State:<\h1><\html> \n Current Temperature %.1f \n ",tempSensor->data);
 	httpd_resp_send(req, resp_str, strlen(resp_str));
 
 
@@ -174,7 +184,7 @@ static esp_err_t set_temp_low_handler(httpd_req_t *req){
 
 			update_thermostat_params_nvs_flash(thermParams, false);
 
-			ESP_LOGI(HTTP_SERVER_TAG, "Setting up Temp High to : %.0f", temp);
+			ESP_LOGI(HTTP_SERVER_TAG, "Setting up Temp Low to : %.0f", temp);
 
 		} else {
 			ESP_LOGE(HTTP_SERVER_TAG, "Temp Low can't be bigger than Temp High!");
@@ -231,7 +241,7 @@ static esp_err_t set_temp_high_handler(httpd_req_t *req){
 
 			update_thermostat_params_nvs_flash(thermParams, false);
 
-			ESP_LOGI(HTTP_SERVER_TAG, "Setting up Temp Low to : %.0f", temp);
+			ESP_LOGI(HTTP_SERVER_TAG, "Setting up Temp High to : %.0f", temp);
 
 		}
 		else{
@@ -253,6 +263,174 @@ httpd_uri_t set_temp_high = {
      * context to demonstrate it's usage */
     .user_ctx  = NULL
 };
+
+
+//	************** 	Set High Fuse threshold 	**************
+
+static esp_err_t set_fuse_temp_high_handler(httpd_req_t *req){
+
+    char buf[100];
+    int ret, remaining = req->content_len;
+
+    while (remaining > 0) {
+        /* Read the data for the request */
+        if ((ret = httpd_req_recv(req, buf,
+                        MIN(remaining, sizeof(buf)))) <= 0) {
+            if (ret == HTTPD_SOCK_ERR_TIMEOUT) {
+                /* Retry receiving if timeout occurred */
+                continue;
+            }
+            return ESP_FAIL;
+        }
+
+        /* Send back the same data */
+        httpd_resp_send_chunk(req, buf, ret);
+        remaining -= ret;
+
+        float temp;
+		char *pend;
+		temp = strtof(buf, &pend);
+
+		thermostat_params *thermParams = (thermostat_params*) req->user_ctx;
+		if(temp >= thermParams->temp_fuse_low){
+			thermParams->temp_fuse_high = (uint8_t)temp;
+
+			update_thermostat_params_nvs_flash(thermParams, false);
+
+			ESP_LOGI(HTTP_SERVER_TAG, "Setting up Fuse Temp High to : %.0f", temp);
+
+		}
+		else{
+			ESP_LOGE(HTTP_SERVER_TAG, "Fuse Temp High can't be lower than Temp Low!");
+		}
+
+    }
+
+    // End response
+    httpd_resp_send_chunk(req, NULL, 0);
+    return ESP_OK;
+}
+
+httpd_uri_t set_fuse_temp_high = {
+    .uri       = "/fuse/h",
+    .method    = HTTP_POST,
+    .handler   = set_fuse_temp_high_handler,
+    /* Let's pass response string in user
+     * context to demonstrate it's usage */
+    .user_ctx  = NULL
+};
+
+//	************** 	Set Low Fuse threshold 	**************
+
+static esp_err_t set_fuse_temp_low_handler(httpd_req_t *req){
+
+    char buf[100];
+    int ret, remaining = req->content_len;
+
+    while (remaining > 0) {
+        /* Read the data for the request */
+        if ((ret = httpd_req_recv(req, buf,
+                        MIN(remaining, sizeof(buf)))) <= 0) {
+            if (ret == HTTPD_SOCK_ERR_TIMEOUT) {
+                /* Retry receiving if timeout occurred */
+                continue;
+            }
+            return ESP_FAIL;
+        }
+
+        /* Send back the same data */
+        httpd_resp_send_chunk(req, buf, ret);
+        remaining -= ret;
+
+        float temp;
+		char *pend;
+		temp = strtof(buf, &pend);
+
+		thermostat_params *thermParams = (thermostat_params*) req->user_ctx;
+		if(temp <= thermParams->temp_fuse_high){
+			thermParams->temp_fuse_low = (uint8_t)temp;
+
+			update_thermostat_params_nvs_flash(thermParams, false);
+
+			ESP_LOGI(HTTP_SERVER_TAG, "Setting up Fuse Temp Low to : %.0f", temp);
+
+		}
+		else{
+			ESP_LOGE(HTTP_SERVER_TAG, "Fuse Temp Low can't be heighier than Temp High!");
+		}
+
+    }
+
+    // End response
+    httpd_resp_send_chunk(req, NULL, 0);
+    return ESP_OK;
+}
+
+httpd_uri_t set_fuse_temp_low = {
+    .uri       = "/fuse/l",
+    .method    = HTTP_POST,
+    .handler   = set_fuse_temp_low_handler,
+    /* Let's pass response string in user
+     * context to demonstrate it's usage */
+    .user_ctx  = NULL
+};
+
+//	************** 	Set Main Loop Period **************
+
+static esp_err_t set_main_loop_period_handler(httpd_req_t *req){
+
+    char buf[100];
+    int ret, remaining = req->content_len;
+
+    while (remaining > 0) {
+        /* Read the data for the request */
+        if ((ret = httpd_req_recv(req, buf,
+                        MIN(remaining, sizeof(buf)))) <= 0) {
+            if (ret == HTTPD_SOCK_ERR_TIMEOUT) {
+                /* Retry receiving if timeout occurred */
+                continue;
+            }
+            return ESP_FAIL;
+        }
+
+        /* Send back the same data */
+        httpd_resp_send_chunk(req, buf, ret);
+        remaining -= ret;
+
+        uint32_t period;
+		char *pend;
+		period = strtof(buf, &pend);
+
+		thermostat_params *thermParams = (thermostat_params*) req->user_ctx;
+		if(period){
+			thermParams->period = period;
+
+			update_thermostat_params_nvs_flash(thermParams, false);
+
+			ESP_LOGI(HTTP_SERVER_TAG, "Setting up main loop period to : %d", period);
+
+		}
+		else{
+			ESP_LOGE(HTTP_SERVER_TAG, "Period can't be equal to 0!");
+		}
+
+    }
+
+    // End response
+    httpd_resp_send_chunk(req, NULL, 0);
+    return ESP_OK;
+}
+
+httpd_uri_t set_main_loop_period = {
+    .uri       = "/period",
+    .method    = HTTP_POST,
+    .handler   = set_main_loop_period_handler,
+    /* Let's pass response string in user
+     * context to demonstrate it's usage */
+    .user_ctx  = NULL
+};
+
+
 
 
 
@@ -333,57 +511,27 @@ static esp_err_t control_panel_get_handler(httpd_req_t *req)
     return ESP_OK;
 }
 
+static esp_err_t control_panel_get_handler_v2(httpd_req_t *req){
 
-static const httpd_uri_t control_panel = {
-    .uri       = "/",
-    .method    = HTTP_GET,
-    .handler   = control_panel_get_handler,
-    /* Let's pass response string in user
-     * context to demonstrate it's usage */
-    .user_ctx  = webPage
-};
+	if (req->user_ctx == NULL) return ESP_FAIL;
+	thermostat_state *thermState = (thermostat_state*)req->user_ctx;
+	if (thermState->thermParams == NULL) return ESP_FAIL;
+	setWebPage_malloc(thermState);
+	if (thermState->thermParams->controlPanelHTML == NULL) return ESP_FAIL;
+	httpd_resp_send(req, thermState->thermParams->controlPanelHTML, thermState->thermParams->controlPanelHTML_len);
 
-//	************** 	Error Handlers  	**************
-
-/* An HTTP POST handler */
-static esp_err_t echo_post_handler(httpd_req_t *req)
-{
-    char buf[100];
-    int ret, remaining = req->content_len;
-
-    while (remaining > 0) {
-        /* Read the data for the request */
-        if ((ret = httpd_req_recv(req, buf,
-                        MIN(remaining, sizeof(buf)))) <= 0) {
-            if (ret == HTTPD_SOCK_ERR_TIMEOUT) {
-                /* Retry receiving if timeout occurred */
-                continue;
-            }
-            return ESP_FAIL;
-        }
-
-        /* Send back the same data */
-        httpd_resp_send_chunk(req, buf, ret);
-        remaining -= ret;
-
-        /* Log data received */
-        ESP_LOGI(HTTP_SERVER_TAG, "=========== RECEIVED DATA ==========");
-        ESP_LOGI(HTTP_SERVER_TAG, "%.*s", ret, buf);
-        ESP_LOGI(HTTP_SERVER_TAG, "====================================");
-    }
-
-    // End response
-    httpd_resp_send_chunk(req, NULL, 0);
-    return ESP_OK;
+	return ESP_OK;
 }
 
-static const httpd_uri_t echo = {
-    .uri       = "/echo",
-    .method    = HTTP_POST,
-    .handler   = echo_post_handler,
+
+httpd_uri_t control_panel = {
+    .uri       = "/",
+    .method    = HTTP_GET,
+    .handler   = control_panel_get_handler_v2,
+    /* Let's pass response string in user
+     * context to demonstrate it's usage */
     .user_ctx  = NULL
 };
-
 
 
 /* This handler allows the custom error handling functionality to be
@@ -420,15 +568,36 @@ esp_err_t http_404_error_handler(httpd_req_t *req, httpd_err_code_t err)
 static httpd_handle_t start_webserver(void *pvParameters)
 {
 
-	thermostat_state *thermState = (thermostat_state*)pvParameters;
-	send_thermostat_state.user_ctx = thermState;
+	if (pvParameters == NULL){
+		ESP_LOGE(HTTP_SERVER_TAG, "Error starting server! NULL pointer!");
+		return NULL;
+	}
 
+	thermostat_state *thermState = (thermostat_state*)pvParameters;
+
+
+	if (thermState == NULL) {
+		ESP_LOGE(HTTP_SERVER_TAG, "Error starting server! NULL pointer!");
+		return NULL;
+	}
+
+	send_thermostat_state.user_ctx = thermState;
+	control_panel.user_ctx = thermState;
 
 	thermostat_params *thermParams = (thermostat_params*)thermState->thermParams;
+
+	if (thermParams == NULL) {
+		ESP_LOGE(HTTP_SERVER_TAG, "Error starting server! NULL pointer!");
+		return NULL;
+	}
+
 	set_temp_high.user_ctx = thermParams;
 	set_temp_low.user_ctx = thermParams;
+	set_fuse_temp_high.user_ctx = thermParams;
+	set_fuse_temp_low.user_ctx = thermParams;
 	set_off_thermostat.user_ctx = thermParams;
 	set_on_thermostat.user_ctx = thermParams;
+	set_main_loop_period.user_ctx = thermParams;
 
     httpd_handle_t server = NULL;
     httpd_config_t config = HTTPD_DEFAULT_CONFIG();
@@ -445,12 +614,14 @@ static httpd_handle_t start_webserver(void *pvParameters)
         httpd_register_uri_handler(server, &set_temp_low);
         httpd_register_uri_handler(server, &set_off_thermostat);
         httpd_register_uri_handler(server, &set_on_thermostat);
-        httpd_register_uri_handler(server, &echo);
         httpd_register_uri_handler(server, &send_thermostat_state);
+        httpd_register_uri_handler(server, &set_fuse_temp_high);
+        httpd_register_uri_handler(server, &set_fuse_temp_low);
+        //httpd_register_uri_handler(server, &set_main_loop_period);
         return server;
     }
 
-    ESP_LOGI(HTTP_SERVER_TAG, "Error starting server!");
+    ESP_LOGE(HTTP_SERVER_TAG, "Error starting server!");
     return NULL;
 }
 
@@ -490,15 +661,6 @@ void http_server_start(void *pvParameters){
     //ESP_ERROR_CHECK(esp_netif_init());
     //ESP_ERROR_CHECK(esp_event_loop_create_default());
 
-
-#ifdef CONFIG_EXAMPLE_CONNECT_WIFI
-    ESP_ERROR_CHECK(esp_event_handler_register(IP_EVENT, IP_EVENT_STA_GOT_IP, &connect_handler, &server));
-    ESP_ERROR_CHECK(esp_event_handler_register(WIFI_EVENT, WIFI_EVENT_STA_DISCONNECTED, &disconnect_handler, &server));
-#endif // CONFIG_EXAMPLE_CONNECT_WIFI
-#ifdef CONFIG_EXAMPLE_CONNECT_ETHERNET
-    ESP_ERROR_CHECK(esp_event_handler_register(IP_EVENT, IP_EVENT_ETH_GOT_IP, &connect_handler, &server));
-    ESP_ERROR_CHECK(esp_event_handler_register(ETH_EVENT, ETHERNET_EVENT_DISCONNECTED, &disconnect_handler, &server));
-#endif // CONFIG_EXAMPLE_CONNECT_ETHERNET
 
     /* Start the server for the first time */
     server = start_webserver(pvParameters);

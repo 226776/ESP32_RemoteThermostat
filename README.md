@@ -47,12 +47,13 @@ Krystian Kasprów:
 - Html web page (control panel) send as http response 
 - Pass data through control panel (browser) to device
 - Thermostat function
+- Found memory leak, fixed 
+- Write thermostat parameters into flash memory (nonvolatile) 
+- Dynamically allocated http requests
 
 ## TODO:
 - Pass data through web page/control panel both directions (print device state)
 - Add script to search for IP device 
-- Device is disconnecting from grid after some time (few minutes), fix needed
-- Save device parameters, and write them after device restart
 
 ## Programm Diagram 
 ![Image description](images/ProgrammDiagram.png)

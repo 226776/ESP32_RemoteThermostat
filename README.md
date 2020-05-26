@@ -50,10 +50,20 @@ Krystian Kasprów:
 - Found memory leak, fixed 
 - Write thermostat parameters into flash memory (nonvolatile) 
 - Dynamically allocated http requests
+- All thermostat parametes are changable via POST requests
 
 ## TODO:
 - Pass data through web page/control panel both directions (print device state)
 - Add script to search for IP device 
+
+## Comunication with thermostat (api)
+Commands form http://<ip>/<command>
+/on      - turn thermostat on
+/off     - turn thermostat off
+/s/h     - set high temperature treshold
+/s/l     - set low temperature treshold
+/period  - set main loop delay time 
+/state   - get information
 
 ## Programm Diagram 
 ![Image description](images/ProgrammDiagram.png)

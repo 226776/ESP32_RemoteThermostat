@@ -58,12 +58,12 @@ Krystian Kasprów:
 
 ## Comunication with thermostat (api)
 Commands form http://<ip>/<command>
-/on      - turn thermostat on
-/off     - turn thermostat off
-/s/h     - set high temperature treshold
-/s/l     - set low temperature treshold
-/period  - set main loop delay time 
-/state   - get information
+- /on      - turn thermostat on
+- /off     - turn thermostat off
+- /s/h     - set high temperature treshold
+- /s/l     - set low temperature treshold
+- /period  - set main loop delay time 
+- /state   - get information
 
 ## Programm Diagram 
 ![Image description](images/ProgrammDiagram.png)
